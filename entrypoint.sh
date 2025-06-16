@@ -148,9 +148,16 @@ fi
 
 echo "=== Starting Frappe LMS Production Server ==="
 
+# Set up the environment for Frappe
+export PYTHONPATH="/home/frappe/frappe-bench/apps:$PYTHONPATH"
+cd /home/frappe/frappe-bench
+
+# Activate the virtual environment and use its gunicorn
+source env/bin/activate
+
 # Railway-compatible single-process production server
 # Using the official Frappe production configuration
-exec gunicorn \
+exec env/bin/gunicorn \
     --bind 0.0.0.0:$PORT \
     --workers 2 \
     --worker-class sync \
@@ -163,5 +170,4 @@ exec gunicorn \
     --access-logfile - \
     --error-logfile - \
     --log-level info \
-    --chdir /home/frappe/frappe-bench \
     frappe.app:application 
