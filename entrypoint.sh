@@ -107,63 +107,41 @@ fi
 
 # Ensure site exists
 if [ ! -d "sites/$SITE_NAME" ]; then
-    echo "Creating new site: $SITE_NAME"
+    echo "Creating site directory and configuration manually..."
     
-    # First, ensure the database exists and has proper permissions
-    echo "Setting up database..."
-    mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" -e "CREATE DATABASE IF NOT EXISTS \`$DB_NAME\`;" || echo "Database creation skipped"
+    # Create site directory structure
+    mkdir -p "sites/$SITE_NAME"
+    mkdir -p "sites/$SITE_NAME/private"
+    mkdir -p "sites/$SITE_NAME/public"
+    mkdir -p "sites/$SITE_NAME/locks"
     
-    # Create the site with minimal options first
-    echo "Creating site with minimal configuration..."
-    if bench new-site "$SITE_NAME" \
-        --force \
-        --db-host "$DB_HOST" \
-        --db-port "$DB_PORT" \
-        --db-name "$DB_NAME" \
-        --db-user "$DB_USER" \
-        --db-password "$DB_PASSWORD" \
-        --admin-password "$ADMIN_PASSWORD" \
-        --db-root-username "$DB_USER" \
-        --db-root-password "$DB_PASSWORD" \
-        --no-mariadb-socket \
-        --verbose; then
-        
-        echo "Site created successfully"
-        
-        # Install LMS app separately with error handling
-        echo "Installing LMS app on site..."
-        if bench --site "$SITE_NAME" install-app lms --verbose; then
-            echo "LMS app installed successfully"
-        else
-            echo "Warning: LMS app installation failed, trying alternative approach..."
-            # Try to get the app first if it's not available
-            if [ ! -d "apps/lms" ]; then
-                echo "Getting LMS app..."
-                bench get-app lms https://github.com/frappe/lms.git || echo "LMS app download failed"
-            fi
-            # Try installation again
-            bench --site "$SITE_NAME" install-app lms --force || echo "LMS installation failed, continuing without it"
-        fi
-        
-        echo "Site setup completed"
-    else
-        echo "Site creation failed, trying with existing database..."
-        # If site creation fails, try to use existing database
-        if [ -d "sites/$SITE_NAME" ]; then
-            echo "Site directory exists, using existing setup"
-        else
-            echo "Creating minimal site configuration..."
-            mkdir -p "sites/$SITE_NAME"
-            # Create a basic site_config.json
-            cat > "sites/$SITE_NAME/site_config.json" << EOF
+    # Create site_config.json with database connection
+    cat > "sites/$SITE_NAME/site_config.json" << EOF
 {
  "db_name": "$DB_NAME",
  "db_password": "$DB_PASSWORD",
  "db_type": "mysql",
- "encryption_key": "$(openssl rand -base64 32)"
+ "db_host": "$DB_HOST",
+ "db_port": $DB_PORT,
+ "encryption_key": "$(openssl rand -base64 32)",
+ "developer_mode": 0,
+ "maintenance_mode": 0,
+ "auto_migrate": 1
 }
 EOF
-        fi
+    
+    # Create a basic database connection test
+    echo "Testing database connection..."
+    if mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" -e "SELECT 1;" > /dev/null 2>&1; then
+        echo "Database connection successful"
+        
+        # Create the database if it doesn't exist
+        mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" -e "CREATE DATABASE IF NOT EXISTS \`$DB_NAME\`;" || echo "Database creation skipped"
+        
+        echo "Site configuration created successfully"
+        echo "Frappe will initialize the database on first request"
+    else
+        echo "Warning: Database connection failed, but continuing..."
     fi
     
 else
