@@ -118,8 +118,8 @@ if [ ! -d "sites/$SITE_NAME" ]; then
         --db-user "$DB_USER" \
         --db-password "$DB_PASSWORD" \
         --admin-password "$ADMIN_PASSWORD" \
-        --mysql-root-username "$DB_USER" \
-        --mysql-root-password "$DB_PASSWORD" \
+        --db-root-username "$DB_USER" \
+        --db-root-password "$DB_PASSWORD" \
         --no-mariadb-socket
     
     echo "Installing LMS app on site..."
