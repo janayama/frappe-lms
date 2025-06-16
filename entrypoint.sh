@@ -42,15 +42,46 @@ for i in {1..10}; do
     sleep 2
 done
 
-# Set up PATH for Node.js
-export PATH="${NVM_DIR}/versions/node/v${NODE_VERSION_DEVELOP}/bin/:${PATH}"
-
 # Check if bench already exists
 if [ -d "/home/frappe/frappe-bench/apps/frappe" ]; then
     echo "Bench already exists, skipping init"
     cd frappe-bench
+    
+    # Check if site already exists
+    if [ ! -d "sites/$SITE_NAME" ]; then
+        echo "Creating new site: $SITE_NAME"
+        
+        # Create the site with custom database settings
+        bench new-site "$SITE_NAME" \
+            --force \
+            --db-host "$DB_HOST" \
+            --db-port "$DB_PORT" \
+            --db-name "$DB_NAME" \
+            --db-user "$DB_USER" \
+            --db-password "$DB_PASSWORD" \
+            --admin-password "$ADMIN_PASSWORD" \
+            --no-mariadb-socket
+        
+        echo "Installing LMS app on site..."
+        bench --site "$SITE_NAME" install-app lms
+        
+        echo "Setting up site configuration..."
+        bench --site "$SITE_NAME" set-config developer_mode 0
+        bench --site "$SITE_NAME" clear-cache
+    else
+        echo "Site $SITE_NAME already exists, skipping creation"
+    fi
+    
+    # Set the site as default
+    bench use "$SITE_NAME"
+    
+    echo "Starting Frappe LMS..."
+    exec bench start
 else
     echo "Creating new bench..."
+    
+    # Set up PATH for Node.js
+    export PATH="${NVM_DIR}/versions/node/v${NODE_VERSION_DEVELOP}/bin/:${PATH}"
     
     # Initialize bench
     bench init --skip-redis-config-generation frappe-bench
@@ -71,16 +102,9 @@ else
     # Get LMS app
     echo "Getting LMS app..."
     bench get-app lms https://github.com/frappe/lms.git
-fi
-
-# Ensure we're in the bench directory
-cd /home/frappe/frappe-bench
-
-# Check if site already exists
-if [ ! -d "sites/$SITE_NAME" ]; then
-    echo "Creating new site: $SITE_NAME"
     
     # Create the site with custom database settings
+    echo "Creating new site: $SITE_NAME"
     bench new-site "$SITE_NAME" \
         --force \
         --db-host "$DB_HOST" \
@@ -100,13 +124,6 @@ if [ ! -d "sites/$SITE_NAME" ]; then
     
     # Set the site as default
     bench use "$SITE_NAME"
-else
-    echo "Site $SITE_NAME already exists, skipping creation"
-    bench use "$SITE_NAME"
-fi
-
-echo "Starting Frappe LMS..."
-
-# For production deployment, we should use gunicorn directly instead of bench start
-# This is more suitable for containerized environments like Railway
-exec gunicorn -b 0.0.0.0:$PORT -w 4 --timeout 120 --preload frappe.app:application 
+    
+    echo "Starting Frappe LMS..."
+    exec bench start 
