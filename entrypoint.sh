@@ -123,10 +123,7 @@ if [ ! -d "sites/$SITE_NAME" ]; then
     echo "Installing LMS app on site..."
     bench --site "$SITE_NAME" install-app lms
     
-    echo "Setting up production configuration..."
-    bench --site "$SITE_NAME" set-config developer_mode 0
-    bench --site "$SITE_NAME" set-config server_script_enabled 1
-    bench --site "$SITE_NAME" clear-cache
+    echo "Site setup completed successfully"
     
 else
     echo "Site $SITE_NAME already exists"
@@ -135,7 +132,7 @@ fi
 # Set the site as default
 bench use "$SITE_NAME"
 
-# Build assets for production
+# Build assets for production (this is safe and necessary)
 echo "Building assets for production..."
 bench build --production
 
@@ -148,10 +145,6 @@ if [ -f "sites/$SITE_NAME/locks/maintenance_mode.lock" ]; then
 else
     echo "Skipping migrations - Frappe will auto-migrate on startup"
 fi
-
-# Clear cache
-bench --site "$SITE_NAME" clear-cache
-bench --site "$SITE_NAME" clear-website-cache
 
 echo "=== Starting Frappe LMS Production Server ==="
 
