@@ -91,9 +91,8 @@ else
     bench use "$SITE_NAME"
 fi
 
-# Run migrations if needed
-echo "Running migrations..."
-bench --site "$SITE_NAME" migrate
+# Skip migrations for now - Frappe will auto-migrate on first request
+echo "Skipping migrations (will auto-migrate on first request)"
 
 # Start the application
 echo "Starting Frappe LMS on port $PORT..."
