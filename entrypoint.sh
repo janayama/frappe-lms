@@ -110,7 +110,7 @@ if [ ! -d "sites/$SITE_NAME" ]; then
     echo "Creating new site: $SITE_NAME"
     
     # Create the site with custom database settings
-    bench new-site "$SITE_NAME" \
+    if bench new-site "$SITE_NAME" \
         --force \
         --db-host "$DB_HOST" \
         --db-port "$DB_PORT" \
@@ -120,12 +120,21 @@ if [ ! -d "sites/$SITE_NAME" ]; then
         --admin-password "$ADMIN_PASSWORD" \
         --db-root-username "$DB_USER" \
         --db-root-password "$DB_PASSWORD" \
-        --no-mariadb-socket
-    
-    echo "Installing LMS app on site..."
-    bench --site "$SITE_NAME" install-app lms
-    
-    echo "Site setup completed successfully"
+        --no-mariadb-socket; then
+        
+        echo "Site created successfully"
+        
+        echo "Installing LMS app on site..."
+        if bench --site "$SITE_NAME" install-app lms; then
+            echo "LMS app installed successfully"
+        else
+            echo "Warning: LMS app installation failed, but continuing..."
+        fi
+        
+        echo "Site setup completed successfully"
+    else
+        echo "Warning: Site creation failed, but continuing with existing setup..."
+    fi
     
 else
     echo "Site $SITE_NAME already exists"
