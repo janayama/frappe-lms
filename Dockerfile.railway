@@ -1,0 +1,43 @@
+FROM python:3.11-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    wget \
+    curl \
+    git \
+    build-essential \
+    default-mysql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs
+
+# Install frappe-bench
+RUN pip install frappe-bench
+
+# Set up bench directory
+WORKDIR /workspace
+RUN bench init frappe-bench --skip-redis-config-generation --skip-assets --python python3.11
+
+WORKDIR /workspace/frappe-bench
+
+# Get LMS app
+RUN bench get-app lms https://github.com/frappe/lms.git
+
+# Create site
+RUN bench new-site lms.localhost \
+    --mariadb-root-password admin \
+    --admin-password admin \
+    --no-mariadb-socket
+
+# Install LMS on site
+RUN bench --site lms.localhost install-app lms
+
+# Set up for production
+RUN bench --site lms.localhost set-config developer_mode 0
+RUN bench --site lms.localhost clear-cache
+
+EXPOSE 8000
+
+CMD ["bench", "start", "--port", "8000"]
