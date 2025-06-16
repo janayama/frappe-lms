@@ -109,7 +109,12 @@ fi
 if [ ! -d "sites/$SITE_NAME" ]; then
     echo "Creating new site: $SITE_NAME"
     
-    # Create the site with custom database settings
+    # First, ensure the database exists and has proper permissions
+    echo "Setting up database..."
+    mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" -e "CREATE DATABASE IF NOT EXISTS \`$DB_NAME\`;" || echo "Database creation skipped"
+    
+    # Create the site with minimal options first
+    echo "Creating site with minimal configuration..."
     if bench new-site "$SITE_NAME" \
         --force \
         --db-host "$DB_HOST" \
@@ -120,20 +125,45 @@ if [ ! -d "sites/$SITE_NAME" ]; then
         --admin-password "$ADMIN_PASSWORD" \
         --db-root-username "$DB_USER" \
         --db-root-password "$DB_PASSWORD" \
-        --no-mariadb-socket; then
+        --no-mariadb-socket \
+        --verbose; then
         
         echo "Site created successfully"
         
+        # Install LMS app separately with error handling
         echo "Installing LMS app on site..."
-        if bench --site "$SITE_NAME" install-app lms; then
+        if bench --site "$SITE_NAME" install-app lms --verbose; then
             echo "LMS app installed successfully"
         else
-            echo "Warning: LMS app installation failed, but continuing..."
+            echo "Warning: LMS app installation failed, trying alternative approach..."
+            # Try to get the app first if it's not available
+            if [ ! -d "apps/lms" ]; then
+                echo "Getting LMS app..."
+                bench get-app lms https://github.com/frappe/lms.git || echo "LMS app download failed"
+            fi
+            # Try installation again
+            bench --site "$SITE_NAME" install-app lms --force || echo "LMS installation failed, continuing without it"
         fi
         
-        echo "Site setup completed successfully"
+        echo "Site setup completed"
     else
-        echo "Warning: Site creation failed, but continuing with existing setup..."
+        echo "Site creation failed, trying with existing database..."
+        # If site creation fails, try to use existing database
+        if [ -d "sites/$SITE_NAME" ]; then
+            echo "Site directory exists, using existing setup"
+        else
+            echo "Creating minimal site configuration..."
+            mkdir -p "sites/$SITE_NAME"
+            # Create a basic site_config.json
+            cat > "sites/$SITE_NAME/site_config.json" << EOF
+{
+ "db_name": "$DB_NAME",
+ "db_password": "$DB_PASSWORD",
+ "db_type": "mysql",
+ "encryption_key": "$(openssl rand -base64 32)"
+}
+EOF
+        fi
     fi
     
 else
