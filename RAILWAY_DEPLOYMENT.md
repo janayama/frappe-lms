@@ -1,141 +1,127 @@
 # Frappe LMS Railway Deployment Guide
 
-This guide will help you deploy Frappe LMS on Railway with MySQL database.
+This guide will help you deploy Frappe LMS on Railway using Docker with MySQL.
 
-## Prerequisites
+## Quick Setup (If you already have MySQL on Railway)
 
-- Railway account connected to your GitHub account
-- This repository forked to your GitHub account
+If you already have a MySQL database service on Railway, you only need to set 2 environment variables:
 
-## Step 1: Set Up Railway Project
+1. `SITE_NAME=your-app-name.railway.app` (replace with your actual Railway domain)
+2. `ADMIN_PASSWORD=your-secure-password`
 
-1. **Create a new Railway project**
-   - Go to [Railway Dashboard](https://railway.app/dashboard)
-   - Click "New Project"
-   - Select "Deploy from GitHub repo"
-   - Choose your forked Frappe LMS repository
+The MySQL connection variables are automatically available from your Railway MySQL service.
 
-2. **Use Existing MySQL Database (Recommended)**
-   - If you already have a MySQL database in your Railway project, you can use it
-   - The Frappe LMS service will automatically connect using the existing MySQL environment variables
-   - No additional database setup required!
+## Full Setup Instructions
 
-3. **Add MySQL Database (If you don't have one)**
-   - In your Railway project dashboard
-   - Click "+ New" 
-   - Select "Database" → "MySQL"
-   - Railway will automatically provision a MySQL instance
+### Step 1: Prepare Your Repository
 
-## Step 2: Configure Environment Variables
+1. Fork or clone the Frappe LMS repository
+2. Add the Railway deployment files to your repository (these should already be present)
 
-In your Frappe LMS service settings, add these environment variables:
+### Step 2: Create Railway Project
 
-### Database Variables (Automatic if using existing MySQL)
-If you're using an existing MySQL database in the same Railway project, these variables are automatically available and **you don't need to set them manually**:
-- `MYSQLHOST` - Automatically provided by Railway
-- `MYSQLPORT` - Automatically provided by Railway  
-- `MYSQLDATABASE` - Automatically provided by Railway
-- `MYSQLUSER` - Automatically provided by Railway
-- `MYSQLPASSWORD` - Automatically provided by Railway
+1. Go to [Railway](https://railway.app)
+2. Click "New Project"
+3. Choose "Deploy from GitHub repo"
+4. Select your Frappe LMS repository
 
-### Manual Database Variables (Only if using external database)
-```
-MYSQLHOST=your-external-mysql-host
-MYSQLPORT=3306
-MYSQLDATABASE=your-database-name
-MYSQLUSER=your-mysql-user
-MYSQLPASSWORD=your-mysql-password
-```
+### Step 3: Add MySQL Database
 
-### Required Application Variables
-```
-SITE_NAME=your-app-name.railway.app
-ADMIN_PASSWORD=your-secure-admin-password
-PORT=8000
-```
+1. In your Railway project, click "New Service"
+2. Choose "Database" → "Add MySQL"
+3. Wait for the database to be provisioned
 
-### Optional Variables
-```
-ENCRYPTION_KEY=your-32-character-encryption-key
-SECRET_KEY=your-secret-key
-```
+### Step 4: Configure Environment Variables
 
-## Step 3: Deploy
+Set these environment variables in your Railway project:
 
-1. **Push changes to GitHub**
-   - Commit all changes to your repository
-   - Push to the main/master branch
-   - Railway will automatically trigger deployment
+**Required:**
+- `SITE_NAME` - Your Railway app domain (e.g., `your-app.railway.app`)
+- `ADMIN_PASSWORD` - Strong password for the Administrator account
 
-2. **Monitor deployment**
-   - Check Railway deployment logs
-   - Initial deployment may take 10-15 minutes
-   - Wait for "Starting Frappe LMS on port 8000..." message
+**Optional (MySQL variables are auto-configured):**
+- `MYSQLHOST` - Database host (auto-set by Railway)
+- `MYSQLPORT` | Database port (auto-set by Railway)
+- `MYSQLDATABASE` | Database name (auto-set by Railway)
+- `MYSQLUSER` | Database username (auto-set by Railway)
+- `MYSQLPASSWORD` | Database password (auto-set by Railway)
 
-3. **Access your application**
-   - Railway will provide a public URL
-   - Access your Frappe LMS instance
-   - Default login: Administrator / [your-admin-password]
+### Step 5: Deploy
 
-## Step 4: Post-Deployment Configuration
+1. Railway will automatically start building and deploying your application
+2. The initial deployment may take 5-10 minutes as it:
+   - Builds the Docker image
+   - Initializes the Frappe bench
+   - Downloads and installs the LMS app
+   - Creates the site and database
+   - Starts the application
 
-### Set up Custom Domain (Optional)
-1. Go to your service settings in Railway
-2. Click "Domains" tab
-3. Add your custom domain
-4. Update DNS records as instructed
+### Step 6: Access Your LMS
 
-### Configure SSL
-- Railway automatically provides SSL certificates
-- No additional configuration needed
+1. Once deployed, click on your service in Railway
+2. Go to the "Settings" tab and find your public URL
+3. Visit your LMS at that URL
+4. Login with:
+   - **Username:** Administrator
+   - **Password:** The password you set in `ADMIN_PASSWORD`
+
+## Health Checks
+
+The application includes comprehensive health checks:
+- **Start Period:** 5 minutes (allows time for initial setup)
+- **Check Interval:** 60 seconds
+- **Timeout:** 30 seconds per check
+- **Retries:** 5 attempts before marking as unhealthy
+
+The health check endpoint is `/api/method/ping` which verifies that the Frappe application is running and responding.
 
 ## Troubleshooting
 
-### Common Issues
+### Deployment Takes Long Time
+- Initial deployment can take 5-10 minutes
+- Check the build logs in Railway dashboard
+- Health checks allow 5 minutes for startup
 
-1. **Database Connection Failed**
-   - Verify all MySQL environment variables are set correctly
-   - Ensure MySQL service is running before Frappe service
+### Database Connection Issues
+- Ensure MySQL service is running in Railway
+- Check that environment variables are properly set
+- Verify database credentials in Railway dashboard
 
-2. **Build Timeout**
-   - Increase build timeout in Railway settings
-   - Consider using a more powerful Railway plan
+### Application Won't Start
+- Check the application logs in Railway
+- Ensure `SITE_NAME` matches your Railway domain
+- Verify `ADMIN_PASSWORD` is set
 
-3. **Memory Issues**
-   - Upgrade to a Railway plan with more memory (minimum 1GB recommended)
-   - Monitor resource usage in Railway dashboard
+### Health Check Failures
+- Health checks now allow 5 minutes for startup
+- Check if the application is responding at `/api/method/ping`
+- Review application logs for startup errors
 
-4. **Site Creation Failed**
-   - Check deployment logs for specific error messages
-   - Verify database credentials and connectivity
+## Architecture
 
-### Viewing Logs
-```bash
-# In Railway dashboard, go to your service and click "Logs"
-# Or use Railway CLI:
-railway logs
-```
+- **Base Image:** `frappe/bench:latest` (official Frappe Docker image)
+- **Database:** Railway MySQL service
+- **Redis:** Built into the container (not external service)
+- **Web Server:** Gunicorn (production-ready WSGI server)
+- **Application:** Frappe LMS with automatic site creation
 
-### Connecting to Database
-```bash
-# Use Railway CLI to connect to your MySQL database:
-railway connect MySQL
-```
+## Environment Variables Reference
 
-## Important Notes
-
-- **Build Time**: Initial deployment takes 10-15 minutes due to Frappe's build process
-- **Memory Requirements**: Minimum 1GB RAM recommended
-- **Database**: Uses Railway's managed MySQL service
-- **Persistence**: Site data is stored in the database and persists across deployments
-- **Scaling**: Railway handles scaling automatically based on your plan
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `SITE_NAME` | Your Railway app domain | `lms.localhost` | Yes |
+| `ADMIN_PASSWORD` | Administrator password | `admin` | Yes |
+| `MYSQLHOST` | Database host | Auto-set by Railway | No |
+| `MYSQLPORT` | Database port | Auto-set by Railway | No |
+| `MYSQLDATABASE` | Database name | Auto-set by Railway | No |
+| `MYSQLUSER` | Database username | Auto-set by Railway | No |
+| `MYSQLPASSWORD` | Database password | Auto-set by Railway | No |
+| `PORT` | Application port | `8000` | No |
 
 ## Support
 
-For issues specific to this deployment:
+If you encounter issues:
 1. Check Railway deployment logs
-2. Verify environment variables
-3. Ensure MySQL service is healthy
-4. Review Frappe LMS documentation
-
-For Railway-specific issues, consult [Railway Documentation](https://docs.railway.app/). 
+2. Verify environment variables are set correctly
+3. Ensure MySQL service is running
+4. Review the troubleshooting section above 

@@ -18,15 +18,32 @@ echo "Database Name: $DB_NAME"
 
 # Wait for database to be ready
 echo "Waiting for database connection..."
-until mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" -e "SELECT 1" >/dev/null 2>&1; do
-  echo "Database not ready, waiting..."
-  sleep 5
+for i in {1..30}; do
+    if mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" -e "SELECT 1" >/dev/null 2>&1; then
+        echo "Database connection established!"
+        break
+    fi
+    echo "Database not ready, waiting... (attempt $i/30)"
+    sleep 10
 done
-echo "Database connection established!"
 
 # Start Redis in the background
 echo "Starting Redis server..."
-redis-server --daemonize yes --port 6379
+redis-server --daemonize yes --port 6379 --bind 127.0.0.1
+
+# Wait for Redis to be ready
+echo "Waiting for Redis..."
+for i in {1..10}; do
+    if redis-cli ping >/dev/null 2>&1; then
+        echo "Redis is ready!"
+        break
+    fi
+    echo "Redis not ready, waiting... (attempt $i/10)"
+    sleep 2
+done
+
+# Set up PATH for Node.js
+export PATH="${NVM_DIR}/versions/node/v${NODE_VERSION_DEVELOP}/bin/:${PATH}"
 
 # Check if bench already exists
 if [ -d "/home/frappe/frappe-bench/apps/frappe" ]; then
@@ -35,9 +52,6 @@ if [ -d "/home/frappe/frappe-bench/apps/frappe" ]; then
 else
     echo "Creating new bench..."
     
-    # Set up PATH for Node.js
-    export PATH="${NVM_DIR}/versions/node/v${NODE_VERSION_DEVELOP}/bin/:${PATH}"
-    
     # Initialize bench
     bench init --skip-redis-config-generation frappe-bench
     cd frappe-bench
@@ -45,12 +59,12 @@ else
     # Configure database connection
     bench set-mariadb-host "$DB_HOST"
     
-    # Configure Redis (use localhost for simplicity, Frappe will handle if not available)
+    # Configure Redis
     bench set-redis-cache-host redis://localhost:6379
     bench set-redis-queue-host redis://localhost:6379
     bench set-redis-socketio-host redis://localhost:6379
     
-    # Remove redis and watch from Procfile since we're not using them
+    # Remove redis and watch from Procfile since we manage them separately
     sed -i '/redis/d' ./Procfile || true
     sed -i '/watch/d' ./Procfile || true
     
@@ -91,10 +105,8 @@ else
     bench use "$SITE_NAME"
 fi
 
-# Skip migrations for now - Frappe will auto-migrate on first request
-echo "Skipping migrations (will auto-migrate on first request)"
+echo "Starting Frappe LMS..."
 
-# Start the application
-echo "Starting Frappe LMS on port $PORT..."
-# Use bench start which is the standard way to start Frappe
-exec bench start 
+# For production deployment, we should use gunicorn directly instead of bench start
+# This is more suitable for containerized environments like Railway
+exec gunicorn -b 0.0.0.0:$PORT -w 4 --timeout 120 --preload frappe.app:application 

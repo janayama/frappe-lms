@@ -18,20 +18,21 @@ RUN apt-get update && apt-get install -y \
 USER frappe
 WORKDIR /home/frappe
 
-# Copy the initialization script
+# Copy the initialization script and health check
 COPY entrypoint.sh /home/frappe/entrypoint.sh
+COPY healthcheck.sh /home/frappe/healthcheck.sh
 
-# Make the script executable
+# Make the scripts executable
 USER root
-RUN chmod +x /home/frappe/entrypoint.sh
+RUN chmod +x /home/frappe/entrypoint.sh /home/frappe/healthcheck.sh
 USER frappe
 
 # Expose port
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=120s --retries=3 \
-    CMD curl -f http://localhost:8000/api/method/ping || exit 1
+# Health check - More lenient for Railway deployment
+HEALTHCHECK --interval=60s --timeout=30s --start-period=300s --retries=5 \
+    CMD /home/frappe/healthcheck.sh
 
 # Use entrypoint script
 ENTRYPOINT ["/home/frappe/entrypoint.sh"] 
