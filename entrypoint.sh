@@ -11,7 +11,7 @@ DB_USER=${MYSQLUSER:-root}
 DB_PASSWORD=${MYSQLPASSWORD:-admin}
 PORT=${PORT:-8000}
 
-echo "=== Frappe LMS Production Startup ==="
+echo "=== Frappe LMS Railway Production Setup ==="
 echo "Site: $SITE_NAME"
 echo "Database Host: $DB_HOST:$DB_PORT"
 echo "Database Name: $DB_NAME"
@@ -31,7 +31,7 @@ wait_for_service() {
             return 0
         fi
         echo "$service_name not ready, waiting... (attempt $attempt/$max_attempts)"
-        sleep 10
+        sleep 5
         attempt=$((attempt + 1))
     done
     
@@ -44,7 +44,7 @@ wait_for_service "Database" \
     "mysql -h\"$DB_HOST\" -P\"$DB_PORT\" -u\"$DB_USER\" -p\"$DB_PASSWORD\" -e \"SELECT 1\"" \
     30
 
-# Start Redis in the background
+# Start Redis in the background (Railway single-process pattern)
 echo "Starting Redis server..."
 redis-server --daemonize yes --port 6379 --bind 127.0.0.1 --maxmemory 256mb --maxmemory-policy allkeys-lru
 
@@ -73,6 +73,17 @@ if [ ! -d "frappe-bench" ]; then
     bench set-redis-queue-host redis://localhost:6379
     bench set-redis-socketio-host redis://localhost:6379
     
+    # Configure common site settings
+    cat > sites/common_site_config.json << EOF
+{
+  "redis_cache": "redis://localhost:6379",
+  "redis_queue": "redis://localhost:6379", 
+  "redis_socketio": "redis://localhost:6379",
+  "background_workers": 1,
+  "gunicorn_workers": 2
+}
+EOF
+    
     # Get LMS app
     echo "Getting LMS app..."
     bench get-app lms https://github.com/frappe/lms.git
@@ -80,6 +91,18 @@ if [ ! -d "frappe-bench" ]; then
 else
     echo "Bench already exists, using existing setup"
     cd frappe-bench
+    
+    # Ensure Redis configuration is up to date
+    echo "Updating Redis configuration..."
+    cat > sites/common_site_config.json << EOF
+{
+  "redis_cache": "redis://localhost:6379",
+  "redis_queue": "redis://localhost:6379", 
+  "redis_socketio": "redis://localhost:6379",
+  "background_workers": 1,
+  "gunicorn_workers": 2
+}
+EOF
 fi
 
 # Ensure site exists
@@ -100,7 +123,7 @@ if [ ! -d "sites/$SITE_NAME" ]; then
     echo "Installing LMS app on site..."
     bench --site "$SITE_NAME" install-app lms
     
-    echo "Setting up site configuration..."
+    echo "Setting up production configuration..."
     bench --site "$SITE_NAME" set-config developer_mode 0
     bench --site "$SITE_NAME" set-config server_script_enabled 1
     bench --site "$SITE_NAME" clear-cache
@@ -116,43 +139,36 @@ bench use "$SITE_NAME"
 echo "Building assets for production..."
 bench build --production
 
-# Setup production configuration
-echo "Setting up production configuration..."
+# Run migrations if needed (skip for new sites, Frappe will auto-migrate)
+echo "Checking if migrations are needed..."
+if [ -f "sites/$SITE_NAME/locks/maintenance_mode.lock" ]; then
+    echo "Site in maintenance mode, running migrations..."
+    # Only run migrations if site is in maintenance mode
+    bench --site "$SITE_NAME" --force migrate
+else
+    echo "Skipping migrations - Frappe will auto-migrate on startup"
+fi
 
-# Create a simple Procfile for production
-cat > Procfile << EOF
-web: gunicorn -b 0.0.0.0:$PORT -w 4 --timeout 120 --preload frappe.app:application --max-requests 5000 --max-requests-jitter 500
-worker: python -m frappe.utils.bench worker
-schedule: python -m frappe.utils.bench schedule
-socketio: node apps/frappe/socketio.js
-EOF
-
-# Create production site config
-bench --site "$SITE_NAME" set-config maintenance_mode 0
-bench --site "$SITE_NAME" set-config allow_tests 0
-
-# Migrate if needed
-echo "Running migrations..."
-bench --site "$SITE_NAME" migrate
-
-# Clear cache and build
+# Clear cache
 bench --site "$SITE_NAME" clear-cache
 bench --site "$SITE_NAME" clear-website-cache
 
-echo "=== Starting Frappe LMS in Production Mode ==="
+echo "=== Starting Frappe LMS Production Server ==="
 
-# Start the application using gunicorn for production
+# Railway-compatible single-process production server
+# Using the official Frappe production configuration
 exec gunicorn \
     --bind 0.0.0.0:$PORT \
-    --workers 4 \
+    --workers 2 \
     --worker-class sync \
     --worker-connections 1000 \
     --timeout 120 \
     --keepalive 5 \
-    --max-requests 5000 \
-    --max-requests-jitter 500 \
+    --max-requests 1000 \
+    --max-requests-jitter 100 \
     --preload \
     --access-logfile - \
     --error-logfile - \
     --log-level info \
+    --chdir /home/frappe/frappe-bench \
     frappe.app:application 
