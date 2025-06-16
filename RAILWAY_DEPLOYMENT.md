@@ -1,127 +1,219 @@
-# Frappe LMS Railway Deployment Guide
+# Frappe LMS Production Deployment on Railway
 
-This guide will help you deploy Frappe LMS on Railway using Docker with MySQL.
+This guide provides a **production-ready** deployment of Frappe LMS on Railway using Docker with MySQL.
 
-## Quick Setup (If you already have MySQL on Railway)
+## 🚀 Quick Setup (Recommended)
 
-If you already have a MySQL database service on Railway, you only need to set 2 environment variables:
+If you already have a MySQL database service on Railway:
 
-1. `SITE_NAME=your-app-name.railway.app` (replace with your actual Railway domain)
-2. `ADMIN_PASSWORD=your-secure-password`
+1. **Set Environment Variables:**
+   ```
+   SITE_NAME=your-app-name.railway.app
+   ADMIN_PASSWORD=your-secure-password
+   ```
 
-The MySQL connection variables are automatically available from your Railway MySQL service.
+2. **Deploy:** The MySQL connection variables are automatically available from Railway's MySQL service.
 
-## Full Setup Instructions
+## 📋 Complete Setup Guide
 
-### Step 1: Prepare Your Repository
+### Step 1: Prerequisites
 
-1. Fork or clone the Frappe LMS repository
-2. Add the Railway deployment files to your repository (these should already be present)
+- Railway account
+- GitHub repository with this code
+- MySQL database service on Railway (recommended) or external MySQL
 
-### Step 2: Create Railway Project
+### Step 2: Environment Variables
 
-1. Go to [Railway](https://railway.app)
-2. Click "New Project"
-3. Choose "Deploy from GitHub repo"
-4. Select your Frappe LMS repository
+#### Required Variables:
+- `SITE_NAME` - Your Railway app domain (e.g., `myapp.railway.app`)
+- `ADMIN_PASSWORD` - Secure password for the Administrator account
 
-### Step 3: Add MySQL Database
+#### Optional Variables (if using external MySQL):
+- `MYSQLHOST` - MySQL host
+- `MYSQLPORT` - MySQL port (default: 3306)
+- `MYSQLDATABASE` - Database name
+- `MYSQLUSER` - MySQL username
+- `MYSQLPASSWORD` - MySQL password
 
-1. In your Railway project, click "New Service"
-2. Choose "Database" → "Add MySQL"
-3. Wait for the database to be provisioned
+### Step 3: Deploy to Railway
 
-### Step 4: Configure Environment Variables
+1. **Connect Repository:**
+   - Go to [Railway](https://railway.app)
+   - Create new project from GitHub repository
+   - Select this repository
 
-Set these environment variables in your Railway project:
+2. **Configure Environment:**
+   - Add the required environment variables
+   - Ensure MySQL service is running
 
-**Required:**
-- `SITE_NAME` - Your Railway app domain (e.g., `your-app.railway.app`)
-- `ADMIN_PASSWORD` - Strong password for the Administrator account
+3. **Deploy:**
+   - Railway will automatically build and deploy using the Dockerfile
+   - Initial deployment may take 5-10 minutes
 
-**Optional (MySQL variables are auto-configured):**
-- `MYSQLHOST` - Database host (auto-set by Railway)
-- `MYSQLPORT` | Database port (auto-set by Railway)
-- `MYSQLDATABASE` | Database name (auto-set by Railway)
-- `MYSQLUSER` | Database username (auto-set by Railway)
-- `MYSQLPASSWORD` | Database password (auto-set by Railway)
+## 🏗️ Architecture Overview
 
-### Step 5: Deploy
+### Production Features:
+- **Gunicorn WSGI Server** - Production-grade Python web server
+- **Multi-worker Configuration** - 4 workers for better performance
+- **Redis Caching** - In-memory caching for improved speed
+- **Asset Building** - Optimized static assets for production
+- **Health Monitoring** - Comprehensive health checks
+- **Graceful Error Handling** - Robust error recovery
 
-1. Railway will automatically start building and deploying your application
-2. The initial deployment may take 5-10 minutes as it:
-   - Builds the Docker image
-   - Initializes the Frappe bench
-   - Downloads and installs the LMS app
-   - Creates the site and database
-   - Starts the application
+### Process Management:
+- **Web Server:** Gunicorn with 4 workers
+- **Background Workers:** Frappe task queue processing
+- **Scheduler:** Automated task scheduling
+- **Redis:** In-memory data structure store
 
-### Step 6: Access Your LMS
+## 🔧 Configuration Details
 
-1. Once deployed, click on your service in Railway
-2. Go to the "Settings" tab and find your public URL
-3. Visit your LMS at that URL
-4. Login with:
-   - **Username:** Administrator
-   - **Password:** The password you set in `ADMIN_PASSWORD`
-
-## Health Checks
-
-The application includes comprehensive health checks:
-- **Start Period:** 5 minutes (allows time for initial setup)
+### Health Checks:
+- **Startup Period:** 5 minutes (300 seconds)
 - **Check Interval:** 60 seconds
 - **Timeout:** 30 seconds per check
 - **Retries:** 5 attempts before marking as unhealthy
 
-The health check endpoint is `/api/method/ping` which verifies that the Frappe application is running and responding.
+### Performance Settings:
+- **Workers:** 4 Gunicorn workers
+- **Timeout:** 120 seconds per request
+- **Max Requests:** 5000 per worker (with jitter)
+- **Keep-alive:** 5 seconds
 
-## Troubleshooting
+## 🐛 Troubleshooting
 
-### Deployment Takes Long Time
-- Initial deployment can take 5-10 minutes
-- Check the build logs in Railway dashboard
-- Health checks allow 5 minutes for startup
+### Common Issues:
 
-### Database Connection Issues
-- Ensure MySQL service is running in Railway
-- Check that environment variables are properly set
-- Verify database credentials in Railway dashboard
+#### 1. Health Check Failures
+**Symptoms:** "Service unavailable" errors, deployment fails
+**Solutions:**
+- Check logs for startup errors
+- Verify database connection
+- Ensure environment variables are set correctly
+- Wait for full startup (can take 5+ minutes)
 
-### Application Won't Start
-- Check the application logs in Railway
-- Ensure `SITE_NAME` matches your Railway domain
-- Verify `ADMIN_PASSWORD` is set
+#### 2. Database Connection Issues
+**Symptoms:** "Can't connect to MySQL server"
+**Solutions:**
+- Verify MySQL service is running
+- Check MYSQL* environment variables
+- Ensure database exists and user has permissions
 
-### Health Check Failures
-- Health checks now allow 5 minutes for startup
-- Check if the application is responding at `/api/method/ping`
-- Review application logs for startup errors
+#### 3. Site Creation Failures
+**Symptoms:** "Site already exists" or database errors
+**Solutions:**
+- Check if site directory exists in logs
+- Verify database permissions
+- Try with a different SITE_NAME
 
-## Architecture
+#### 4. Asset Building Errors
+**Symptoms:** Missing CSS/JS, styling issues
+**Solutions:**
+- Check build logs for Node.js errors
+- Verify all dependencies are installed
+- Clear cache and rebuild
 
-- **Base Image:** `frappe/bench:latest` (official Frappe Docker image)
-- **Database:** Railway MySQL service
-- **Redis:** Built into the container (not external service)
-- **Web Server:** Gunicorn (production-ready WSGI server)
-- **Application:** Frappe LMS with automatic site creation
+### Debugging Commands:
 
-## Environment Variables Reference
+If you have SSH access to the container:
+```bash
+# Check application status
+ps aux | grep gunicorn
 
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `SITE_NAME` | Your Railway app domain | `lms.localhost` | Yes |
-| `ADMIN_PASSWORD` | Administrator password | `admin` | Yes |
-| `MYSQLHOST` | Database host | Auto-set by Railway | No |
-| `MYSQLPORT` | Database port | Auto-set by Railway | No |
-| `MYSQLDATABASE` | Database name | Auto-set by Railway | No |
-| `MYSQLUSER` | Database username | Auto-set by Railway | No |
-| `MYSQLPASSWORD` | Database password | Auto-set by Railway | No |
-| `PORT` | Application port | `8000` | No |
+# Check Redis status
+redis-cli ping
 
-## Support
+# Check database connection
+mysql -h$MYSQLHOST -u$MYSQLUSER -p$MYSQLPASSWORD -e "SELECT 1"
 
-If you encounter issues:
-1. Check Railway deployment logs
-2. Verify environment variables are set correctly
-3. Ensure MySQL service is running
-4. Review the troubleshooting section above 
+# Check site status
+cd /home/frappe/frappe-bench
+bench --site $SITE_NAME doctor
+
+# View logs
+tail -f logs/web.log
+tail -f logs/worker.log
+```
+
+## 📊 Monitoring
+
+### Application Logs:
+- **Access Logs:** HTTP request logging
+- **Error Logs:** Application error tracking
+- **Worker Logs:** Background task processing
+- **Scheduler Logs:** Automated task execution
+
+### Health Endpoints:
+- `/` - Basic application health
+- `/api/method/ping` - API health check
+- `/api/method/frappe.ping` - Framework health check
+
+## 🔒 Security Considerations
+
+### Production Security:
+- **Developer Mode:** Disabled
+- **Debug Mode:** Disabled
+- **Server Scripts:** Enabled (configurable)
+- **Maintenance Mode:** Disabled
+- **Test Mode:** Disabled
+
+### Recommended Settings:
+- Use strong `ADMIN_PASSWORD`
+- Enable HTTPS (Railway provides this automatically)
+- Regular database backups
+- Monitor access logs
+
+## 🚀 Performance Optimization
+
+### For High Traffic:
+1. **Scale Workers:** Increase Gunicorn workers
+2. **Database Optimization:** Use connection pooling
+3. **Caching:** Implement Redis clustering
+4. **CDN:** Use Railway's edge caching
+5. **Monitoring:** Set up application monitoring
+
+### Resource Requirements:
+- **Minimum:** 1GB RAM, 1 CPU
+- **Recommended:** 2GB RAM, 2 CPU
+- **High Traffic:** 4GB+ RAM, 4+ CPU
+
+## 📝 Maintenance
+
+### Regular Tasks:
+- **Database Backups:** Use Railway's backup features
+- **Log Rotation:** Monitor log file sizes
+- **Security Updates:** Keep base image updated
+- **Performance Monitoring:** Track response times
+
+### Update Process:
+1. Test changes in development
+2. Create backup of production data
+3. Deploy new version
+4. Monitor health checks
+5. Rollback if issues occur
+
+## 🆘 Support
+
+### Getting Help:
+- **Railway Docs:** [railway.app/docs](https://railway.app/docs)
+- **Frappe Community:** [discuss.frappe.io](https://discuss.frappe.io)
+- **LMS Documentation:** [github.com/frappe/lms](https://github.com/frappe/lms)
+
+### Reporting Issues:
+Include the following information:
+- Railway deployment logs
+- Environment variables (without sensitive data)
+- Error messages
+- Steps to reproduce
+
+---
+
+## 🎉 Success!
+
+Once deployed successfully, you should be able to:
+- Access your LMS at `https://your-app-name.railway.app`
+- Login with Administrator and your `ADMIN_PASSWORD`
+- Create courses and manage content
+- Monitor performance through Railway dashboard
+
+**Note:** Initial setup may take 5-10 minutes. The application will be available once health checks pass. 

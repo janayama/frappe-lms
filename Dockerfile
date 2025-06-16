@@ -22,9 +22,12 @@ WORKDIR /home/frappe
 COPY entrypoint.sh /home/frappe/entrypoint.sh
 COPY healthcheck.sh /home/frappe/healthcheck.sh
 
-# Make the scripts executable
+# Make the scripts executable and install production dependencies
 USER root
-RUN chmod +x /home/frappe/entrypoint.sh /home/frappe/healthcheck.sh
+RUN chmod +x /home/frappe/entrypoint.sh /home/frappe/healthcheck.sh && \
+    pip3 install --no-cache-dir gunicorn psutil && \
+    apt-get update && apt-get install -y procps && \
+    rm -rf /var/lib/apt/lists/*
 USER frappe
 
 # Expose port
