@@ -126,9 +126,16 @@ if [ ! -d "sites/$SITE_NAME" ]; then
  "encryption_key": "$(openssl rand -base64 32)",
  "developer_mode": 0,
  "maintenance_mode": 0,
- "auto_migrate": 1
+ "auto_migrate": 1,
+ "host_name": "https://$SITE_NAME"
 }
 EOF
+    
+    # Also create the sites.txt file to register the site
+    echo "$SITE_NAME" > sites/sites.txt
+    
+    # Create currentsite.txt to set this as the default site
+    echo "$SITE_NAME" > sites/currentsite.txt
     
     # Create a basic database connection test
     echo "Testing database connection..."
@@ -146,6 +153,19 @@ EOF
     
 else
     echo "Site $SITE_NAME already exists"
+    
+    # Ensure the site is properly registered
+    echo "$SITE_NAME" > sites/sites.txt
+    echo "$SITE_NAME" > sites/currentsite.txt
+    
+    # Update the site config to include host_name if missing
+    if [ -f "sites/$SITE_NAME/site_config.json" ]; then
+        # Check if host_name is missing and add it
+        if ! grep -q "host_name" "sites/$SITE_NAME/site_config.json"; then
+            # Add host_name to existing config
+            sed -i '$ s/}/,\n "host_name": "https:\/\/'$SITE_NAME'"\n}/' "sites/$SITE_NAME/site_config.json"
+        fi
+    fi
 fi
 
 # Set the site as default
