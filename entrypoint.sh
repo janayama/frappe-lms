@@ -96,4 +96,5 @@ echo "Skipping migrations (will auto-migrate on first request)"
 
 # Start the application
 echo "Starting Frappe LMS on port $PORT..."
-exec bench serve --port "$PORT" --host 0.0.0.0 
+# Use bench start which is the standard way to start Frappe
+exec bench start 
