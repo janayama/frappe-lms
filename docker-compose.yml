@@ -18,9 +18,8 @@ services:
       - PORT=${PORT:-8000}
     depends_on:
       - db
-      - redis
     volumes:
-      - lms_data:/home/frappe/frappe-bench/sites
+      - lms_data:/home/frappe/frappe-bench
 
   db:
     image: mysql:8.0
@@ -34,11 +33,6 @@ services:
       - db_data:/var/lib/mysql
     ports:
       - "3306:3306"
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
 
 volumes:
   lms_data:

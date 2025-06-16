@@ -52,6 +52,13 @@ The system automatically uses these variables from your existing MySQL service:
 - ✅ `MYSQLUSER` - Auto-detected
 - ✅ `MYSQLPASSWORD` - Auto-detected
 
+## Built-in Services
+
+The container includes:
+- ✅ **Redis** - Built-in for caching and queues
+- ✅ **MySQL Client** - For database connectivity
+- ✅ **Frappe Framework** - Complete LMS platform
+
 ## Troubleshooting
 
 If deployment fails:

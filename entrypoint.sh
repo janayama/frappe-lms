@@ -24,45 +24,74 @@ until mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" -e "SELECT 1
 done
 echo "Database connection established!"
 
-# Create common site config
-cat > sites/common_site_config.json << EOF
-{
-  "db_host": "$DB_HOST",
-  "db_port": $DB_PORT,
-  "redis_cache": "redis://localhost:6379",
-  "redis_queue": "redis://localhost:6379",
-  "redis_socketio": "redis://localhost:6379",
-  "developer_mode": 0,
-  "disable_website_cache": 1
-}
-EOF
+# Start Redis in the background
+echo "Starting Redis server..."
+redis-server --daemonize yes --port 6379
+
+# Check if bench already exists
+if [ -d "/home/frappe/frappe-bench/apps/frappe" ]; then
+    echo "Bench already exists, skipping init"
+    cd frappe-bench
+else
+    echo "Creating new bench..."
+    
+    # Set up PATH for Node.js
+    export PATH="${NVM_DIR}/versions/node/v${NODE_VERSION_DEVELOP}/bin/:${PATH}"
+    
+    # Initialize bench
+    bench init --skip-redis-config-generation frappe-bench
+    cd frappe-bench
+    
+    # Configure database connection
+    bench set-mariadb-host "$DB_HOST"
+    
+    # Configure Redis (use localhost for simplicity, Frappe will handle if not available)
+    bench set-redis-cache-host redis://localhost:6379
+    bench set-redis-queue-host redis://localhost:6379
+    bench set-redis-socketio-host redis://localhost:6379
+    
+    # Remove redis and watch from Procfile since we're not using them
+    sed -i '/redis/d' ./Procfile || true
+    sed -i '/watch/d' ./Procfile || true
+    
+    # Get LMS app
+    echo "Getting LMS app..."
+    bench get-app lms https://github.com/frappe/lms.git
+fi
+
+# Ensure we're in the bench directory
+cd /home/frappe/frappe-bench
 
 # Check if site already exists
 if [ ! -d "sites/$SITE_NAME" ]; then
-  echo "Creating new site: $SITE_NAME"
-  
-  # Create the site
-  bench new-site "$SITE_NAME" \
-    --db-host "$DB_HOST" \
-    --db-port "$DB_PORT" \
-    --db-name "$DB_NAME" \
-    --db-user "$DB_USER" \
-    --db-password "$DB_PASSWORD" \
-    --admin-password "$ADMIN_PASSWORD" \
-    --no-mariadb-socket
-  
-  echo "Installing LMS app on site..."
-  bench --site "$SITE_NAME" install-app lms
-  
-  echo "Setting up site configuration..."
-  bench --site "$SITE_NAME" set-config developer_mode 0
-  bench --site "$SITE_NAME" clear-cache
-  bench --site "$SITE_NAME" build
+    echo "Creating new site: $SITE_NAME"
+    
+    # Create the site with custom database settings
+    bench new-site "$SITE_NAME" \
+        --force \
+        --db-host "$DB_HOST" \
+        --db-port "$DB_PORT" \
+        --db-name "$DB_NAME" \
+        --db-user "$DB_USER" \
+        --db-password "$DB_PASSWORD" \
+        --admin-password "$ADMIN_PASSWORD" \
+        --no-mariadb-socket
+    
+    echo "Installing LMS app on site..."
+    bench --site "$SITE_NAME" install-app lms
+    
+    echo "Setting up site configuration..."
+    bench --site "$SITE_NAME" set-config developer_mode 0
+    bench --site "$SITE_NAME" clear-cache
+    
+    # Set the site as default
+    bench use "$SITE_NAME"
 else
-  echo "Site $SITE_NAME already exists, skipping creation"
+    echo "Site $SITE_NAME already exists, skipping creation"
+    bench use "$SITE_NAME"
 fi
 
-# Migrate if needed
+# Run migrations if needed
 echo "Running migrations..."
 bench --site "$SITE_NAME" migrate
 
