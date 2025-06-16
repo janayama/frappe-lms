@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  lms:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      - MYSQLHOST=${MYSQLHOST:-db}
+      - MYSQLPORT=${MYSQLPORT:-3306}
+      - MYSQLDATABASE=${MYSQLDATABASE:-lms_db}
+      - MYSQLUSER=${MYSQLUSER:-lms_user}
+      - MYSQLPASSWORD=${MYSQLPASSWORD:-lms_password}
+      - SITE_NAME=${SITE_NAME:-lms.localhost}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+      - PORT=${PORT:-8000}
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - lms_data:/home/frappe/frappe-bench/sites
+
+  db:
+    image: mysql:8.0
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-root_password}
+      - MYSQL_DATABASE=${MYSQLDATABASE:-lms_db}
+      - MYSQL_USER=${MYSQLUSER:-lms_user}
+      - MYSQL_PASSWORD=${MYSQLPASSWORD:-lms_password}
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  lms_data:
+  db_data:

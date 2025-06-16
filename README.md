@@ -75,6 +75,16 @@ In 2021, we were looking for a Learning Management System to launch [Mon.School]
 
 ## Production Setup
 
+### Railway Deployment (Recommended)
+
+Deploy Frappe LMS on Railway with MySQL in just a few clicks:
+
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/your-template-id)
+
+**Quick Setup Guides:**
+- 🚀 [Quick Setup (Existing MySQL)](RAILWAY_QUICK_SETUP.md) - If you already have MySQL in Railway
+- 📖 [Detailed Setup Guide](RAILWAY_DEPLOYMENT.md) - Complete deployment instructions
+
 ### Managed Hosting
 
 You can try [Frappe Cloud](https://frappecloud.com), a simple, user-friendly and sophisticated [open-source](https://github.com/frappe/press) platform to host Frappe applications with peace of mind.
