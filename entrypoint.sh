@@ -17,6 +17,11 @@ echo "Database Host: $DB_HOST:$DB_PORT"
 echo "Database Name: $DB_NAME"
 echo "Port: $PORT"
 
+# Function to test MySQL connection
+test_mysql_connection() {
+    mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" -e "SELECT 1;" > /dev/null 2>&1
+}
+
 # Function to wait for service
 wait_for_service() {
     local service_name=$1
@@ -56,9 +61,9 @@ wait_for_service "Redis" \
 # Ensure we're in the correct directory
 cd /home/frappe
 
-# Check if bench directory exists, if not create it
+# Check if bench is already initialized
 if [ ! -d "frappe-bench" ]; then
-    echo "Creating new bench..."
+    echo "Initializing bench..."
     
     # Initialize bench
     bench init --skip-redis-config-generation --python python3 frappe-bench
@@ -72,6 +77,9 @@ if [ ! -d "frappe-bench" ]; then
     bench set-redis-cache-host redis://localhost:6379
     bench set-redis-queue-host redis://localhost:6379
     bench set-redis-socketio-host redis://localhost:6379
+    
+    # Ensure sites directory exists
+    mkdir -p sites
     
     # Configure common site settings
     cat > sites/common_site_config.json << EOF
@@ -101,6 +109,9 @@ EOF
 else
     echo "Bench already exists, using existing setup"
     cd frappe-bench
+    
+    # Ensure sites directory exists
+    mkdir -p sites
     
     # Ensure Redis configuration is up to date
     echo "Updating Redis configuration..."
@@ -253,9 +264,4 @@ exec /home/frappe/frappe-bench/env/bin/gunicorn \
     --log-level=info \
     --access-logfile=- \
     --error-logfile=- \
-    static_server:application
-
-# Function to test MySQL connection
-test_mysql_connection() {
-    mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" -e "SELECT 1;" > /dev/null 2>&1
-} 
+    static_server:application 
