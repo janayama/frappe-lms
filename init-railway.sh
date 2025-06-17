@@ -79,7 +79,7 @@ fi
 
 # 6. Start the production server using gunicorn directly
 echo "Starting Gunicorn production server on port $APP_PORT..."
-exec gunicorn \
+exec ./env/bin/gunicorn \
     --bind="0.0.0.0:$APP_PORT" \
     --workers=2 \
     --threads=4 \
