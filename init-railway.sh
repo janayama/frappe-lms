@@ -34,8 +34,8 @@ if [ -d "frappe-bench" ]; then
 fi
 
 # 4. Initialize Frappe Bench from scratch, using a stable framework version.
-echo "Creating new Frappe bench with stable framework (v15)..."
-bench init --frappe-branch v15 frappe-bench
+echo "Creating new Frappe bench with stable framework (version-15)..."
+bench init --frappe-branch version-15 frappe-bench
 echo "Bench initialization complete."
 cd frappe-bench
 
