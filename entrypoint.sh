@@ -279,6 +279,61 @@ if test_mysql_connection; then
     fi
     
     echo "Database initialization completed"
+    
+    # Create the Frappe site properly
+    echo "Creating Frappe site..."
+    cd /home/frappe/frappe-lms-*/
+    export PATH="$HOME/.local/bin:$PATH"
+    
+    # Check if site already exists in Frappe
+    if ! python3 -c "import frappe; frappe.init(site='$SITE_NAME'); print('Site exists')" 2>/dev/null; then
+        echo "Site not found in Frappe, creating it..."
+        
+        # Create the site using Frappe's site creation
+        python3 -c "
+import frappe
+import os
+
+# Set environment
+os.chdir('$(pwd)')
+frappe.init()
+
+# Create the site
+try:
+    from frappe.installer import make_site_dirs
+    from frappe.utils import get_site_config
+    
+    site_name = '$SITE_NAME'
+    print(f'Creating site: {site_name}')
+    
+    # Make sure site directories exist
+    make_site_dirs(site_name)
+    
+    # Create basic site config if it doesn't exist
+    site_config_path = f'sites/{site_name}/site_config.json'
+    if not os.path.exists(site_config_path):
+        import json
+        config = {
+            'db_name': '$DB_NAME',
+            'db_password': '$DB_PASSWORD',
+            'db_type': 'mysql',
+            'db_host': '$DB_HOST',
+            'db_port': $DB_PORT,
+            'installed_apps': ['frappe', 'lms']
+        }
+        with open(site_config_path, 'w') as f:
+            json.dump(config, f, indent=2)
+    
+    print(f'Site {site_name} created successfully')
+    
+except Exception as e:
+    print(f'Error creating site: {e}')
+    print('Continuing with existing setup...')
+"
+    else
+        echo "Site already exists in Frappe"
+    fi
+    
 else
     echo "Warning: Database connection failed, but continuing..."
 fi

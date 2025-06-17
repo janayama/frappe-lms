@@ -116,14 +116,55 @@ def create_app():
             frappe.init(site=site_name)
             frappe.connect()
             print(f"Frappe initialized successfully for site: {site_name}")
+            
+            from frappe.app import application as frappe_app
+            print("Successfully imported and initialized Frappe application!")
+            
         except Exception as init_error:
-            print(f"Warning: Frappe initialization failed: {init_error}")
-            print("Continuing with basic Frappe setup...")
-            # Try basic initialization without site-specific setup
-            frappe.init()
-        
-        from frappe.app import application as frappe_app
-        print("Successfully imported and initialized Frappe application!")
+            print(f"Warning: Frappe site initialization failed: {init_error}")
+            print("The site may not be properly set up in Frappe.")
+            
+            # Create a simple fallback that explains the issue
+            def site_error_app(environ, start_response):
+                path = environ.get('PATH_INFO', '/')
+                status = '200 OK'
+                headers = [('Content-Type', 'text/html')]
+                start_response(status, headers)
+                
+                html = f'''
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Frappe LMS - Site Setup Required</title>
+                    <style>
+                        body {{ font-family: Arial, sans-serif; margin: 40px; }}
+                        .container {{ max-width: 600px; margin: 0 auto; }}
+                        .error {{ background: #f8f8f8; padding: 20px; border-radius: 5px; }}
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <h1>Frappe LMS - Site Setup Required</h1>
+                        <p>The Frappe site needs to be properly initialized.</p>
+                        <div class="error">
+                            <h3>Issue:</h3>
+                            <p><strong>Site:</strong> {site_name}</p>
+                            <p><strong>Error:</strong> {str(init_error)}</p>
+                            <p><strong>Likely cause:</strong> The site "{site_name}" doesn't exist in Frappe's site registry.</p>
+                        </div>
+                        <h3>Next Steps:</h3>
+                        <ol>
+                            <li>The site directory exists but Frappe doesn't recognize it</li>
+                            <li>This usually means we need to run Frappe's site creation process</li>
+                            <li>The database is connected and basic structure exists</li>
+                        </ol>
+                    </div>
+                </body>
+                </html>
+                '''
+                return [html.encode('utf-8')]
+            
+            frappe_app = site_error_app
         
     except ImportError as e:
         print(f"Failed to import Frappe application: {e}")
