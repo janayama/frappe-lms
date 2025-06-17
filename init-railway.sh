@@ -2,7 +2,7 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
-echo "=== Frappe LMS Railway Production Setup - FINAL COMBINED FIX ==="
+echo "=== Frappe LMS Railway Production Setup - DEFINITIVE FIX ==="
 
 # Set environment variables
 export SITE_NAME="${SITE_NAME:-lms.railway.app}"
@@ -29,7 +29,7 @@ echo "Database connection successful!"
 
 # 3. Aggressive Cleanup: Ensure a completely clean slate.
 if [ -d "frappe-bench" ]; then
-    echo "Found existing 'frappe-bench' directory. Wiping it completely."
+    echo "Found existing 'frappe-bench' directory. Wiping it completely to ensure a clean install."
     rm -rf frappe-bench
 fi
 
@@ -39,7 +39,30 @@ bench init --skip-redis-config-generation frappe-bench
 echo "Bench initialization complete."
 cd frappe-bench
 
-# 5. Manually patch Frappe source code for BLOB/TEXT error
+# 5. Manually create the global config BEFORE running new-site.
+echo "Creating global config (common_site_config.json) for the main application..."
+python3 -c "
+import json, os
+config_path = 'sites/common_site_config.json'
+config = {
+    'db_host': os.environ.get('MYSQLHOST'),
+    'db_port': int(os.environ.get('MYSQLPORT', 3306)),
+    'redis_cache': 'redis://localhost:6379',
+    'redis_queue': 'redis://localhost:6379',
+    'redis_socketio': 'redis://localhost:6379',
+    'serve_default_site': True
+}
+with open(config_path, 'w') as f:
+    json.dump(config, f, indent=2)
+
+print('--- common_site_config.json contents ---')
+with open(config_path, 'r') as f:
+    print(f.read())
+print('----------------------------------------')
+print('Global config created.')
+"
+
+# 6. Manually patch Frappe source code for BLOB/TEXT error
 echo "Patching Frappe source for compatibility with modern MySQL..."
 python3 -c "
 import json, os, sys
@@ -61,25 +84,23 @@ except Exception as e:
     sys.exit(1)
 "
 
-# 6. Create and install site
+# 7. Create and install site, providing ALL arguments to prevent any defaults.
 if ! bench --site "$SITE_NAME" list-apps >/dev/null 2>&1; then
     echo "Site '$SITE_NAME' not installed. Starting installation..."
-
-    # Create the site using all necessary flags to prevent interactive prompts AND access denied errors.
     bench new-site "$SITE_NAME" \
         --db-type mariadb \
         --db-name "$DB_NAME" \
+        --db-host "$DB_HOST" \
+        --db-port "$DB_PORT" \
         --mariadb-root-username "$DB_USER" \
         --mariadb-root-password "$DB_PASSWORD" \
         --admin-password "$ADMIN_PASSWORD" \
-        --force \
-        --mariadb-user-host-login-scope '%'
+        --force
     
     bench get-app lms
     bench --site "$SITE_NAME" install-app lms
     
     bench --site "$SITE_NAME" set-config developer_mode 0
-    bench --site "$SITE_NAME" set-config -g serve_default_site true
     bench use "$SITE_NAME"
     bench --site "$SITE_NAME" clear-cache
     echo "Site '$SITE_NAME' created and installed successfully."
@@ -87,7 +108,7 @@ else
     echo "Site '$SITE_NAME' already installed. Skipping creation."
 fi
 
-# 7. Start production server
+# 8. Start production server
 echo "Starting Gunicorn production server on port $APP_PORT..."
 exec ./env/bin/gunicorn \
     --bind="0.0.0.0:$APP_PORT" \
