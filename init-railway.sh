@@ -33,13 +33,13 @@ if [ -d "frappe-bench" ]; then
     rm -rf frappe-bench
 fi
 
-# 4. Initialize Frappe Bench from scratch
-echo "Creating new Frappe bench from a clean slate..."
-bench init --skip-redis-config-generation frappe-bench
+# 4. Initialize Frappe Bench from scratch, using a stable framework version.
+echo "Creating new Frappe bench with stable framework (v15)..."
+bench init --frappe-branch v15 frappe-bench
 echo "Bench initialization complete."
 cd frappe-bench
 
-# 5. Manually create the global config BEFORE running new-site.
+# 5. Manually create the global config BEFORE running site setup.
 echo "Creating global config (common_site_config.json) for the main application..."
 python3 -c "
 import json, os
