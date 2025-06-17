@@ -90,8 +90,8 @@ if ! bench --site "$SITE_NAME" list-apps >/dev/null 2>&1; then
         --mariadb-root-password "$DB_PASSWORD" \
         --admin-password "$ADMIN_PASSWORD" \
         --force \
-        --no-mariadb-socket
-    
+        --mariadb-user-host-login-scope '%'
+
     bench get-app lms
     bench --site "$SITE_NAME" install-app lms
     
