@@ -113,7 +113,17 @@ echo "Using system Python (skipping virtual environment for Railway compatibilit
 # Install Frappe and LMS dependencies using system Python
 echo "Installing Frappe and LMS dependencies..."
 pip3 install --user --upgrade pip
+
+# Install Frappe first with its specific dependencies
+echo "Installing Frappe framework..."
 pip3 install --user -e apps/frappe
+
+# Fix the cairocffi version conflict by forcing the version Frappe needs
+echo "Fixing dependency conflicts..."
+pip3 install --user --force-reinstall cairocffi==1.5.1
+
+# Now install LMS
+echo "Installing LMS application..."
 pip3 install --user -e apps/lms
 
 # Ensure user bin directory is in PATH
