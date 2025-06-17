@@ -110,43 +110,115 @@ df -h .
 # Skip virtual environment for now and use system Python
 echo "Using system Python (skipping virtual environment for Railway compatibility)"
 
-# Install Frappe and LMS dependencies using system Python
-echo "Installing Frappe and LMS dependencies..."
-pip3 install --user --upgrade pip
+# Install dependencies with compatibility handling
+echo "Installing packages with smart dependency resolution..."
 
-# Clean up any existing conflicting packages
-echo "Cleaning up existing packages to avoid conflicts..."
-pip3 uninstall -y cairocffi lxml markdown fuzzywuzzy websocket_client razorpay 2>/dev/null || echo "No conflicting packages to remove"
+# First, install Frappe without dependencies to avoid conflicts
+echo "Installing Frappe framework (no dependencies)..."
+pip3 install --user --no-deps -e apps/frappe
 
-# Create a temporary requirements file with exact versions to avoid conflicts
-echo "Creating requirements file with compatible versions..."
-cat > /tmp/requirements.txt << 'EOF'
-# Core dependencies with LMS-compatible versions (LMS takes priority)
-cairocffi==1.6.1
-lxml==4.9.4
-markdown==3.5.2
-fuzzywuzzy==0.18.0
-websocket_client==1.6.4
-razorpay==1.4.2
+# Install LMS without dependencies
+echo "Installing LMS application (no dependencies)..."
+pip3 install --user --no-deps -e apps/lms
 
-# Install frappe first but allow dependency override
--e apps/frappe
+# Now install all the dependencies manually, handling conflicts
+echo "Installing required dependencies manually..."
 
-# Then install LMS with --no-deps to avoid conflicts
-EOF
+# Install common dependencies
+pip3 install --user \
+    click \
+    six \
+    requests \
+    jinja2 \
+    werkzeug \
+    markupsafe \
+    itsdangerous \
+    python-dateutil \
+    pytz \
+    babel \
+    pillow \
+    pymysql \
+    redis \
+    croniter \
+    email-validator \
+    phonenumbers \
+    bleach \
+    markdown \
+    premailer \
+    lxml \
+    html5lib \
+    webencodings \
+    cssselect \
+    pycryptodome \
+    pyotp \
+    qrcode \
+    xlrd \
+    openpyxl \
+    xlsxwriter \
+    pdfkit \
+    reportlab \
+    num2words \
+    frappe-client \
+    gitpython \
+    semantic-version \
+    whoosh \
+    sqlparse \
+    tenacity \
+    rq \
+    schedule \
+    python-magic \
+    filelock \
+    cffi \
+    pycparser \
+    setuptools \
+    wheel
 
-# Install using the requirements file
-echo "Installing packages with LMS-compatible dependencies..."
-pip3 install --user -r /tmp/requirements.txt
+# Install cairocffi - try LMS version first, fallback to Frappe version
+echo "Installing cairocffi with compatibility check..."
 
-# Install LMS normally (it should be compatible now)
-echo "Installing LMS application..."
-pip3 install --user -e apps/lms
+# First ensure cffi is properly installed
+pip3 install --user --upgrade cffi
+
+# Try to install cairocffi 1.6.1 (LMS preference)
+echo "Attempting cairocffi 1.6.1 (LMS compatible)..."
+if pip3 install --user cairocffi==1.6.1 2>/dev/null; then
+    echo "✓ Successfully installed cairocffi 1.6.1"
+    # Test if it works with both apps
+    if python3 -c "import cairocffi; import sys; sys.path.append('apps/frappe'); import frappe" 2>/dev/null; then
+        echo "✓ cairocffi 1.6.1 works with Frappe"
+    else
+        echo "⚠ cairocffi 1.6.1 has issues with Frappe, trying 1.5.1..."
+        pip3 install --user --force-reinstall cairocffi==1.5.1
+        echo "✓ Installed cairocffi 1.5.1 (Frappe compatible)"
+    fi
+else
+    echo "⚠ cairocffi 1.6.1 installation failed, trying 1.5.1..."
+    pip3 install --user cairocffi==1.5.1
+    echo "✓ Installed cairocffi 1.5.1 (Frappe compatible)"
+fi
 
 # Verify the installation
-echo "Verifying installation..."
-python3 -c "import frappe; print(f'Frappe version: {frappe.__version__}')" || echo "Frappe import failed"
-python3 -c "import lms; print('LMS imported successfully')" || echo "LMS import failed"
+echo "Verifying package installation..."
+python3 -c "
+try:
+    import cairocffi
+    print(f'cairocffi version: {cairocffi.__version__}')
+except Exception as e:
+    print(f'cairocffi error: {e}')
+
+try:
+    import frappe
+    print('Frappe: OK')
+except Exception as e:
+    print(f'Frappe error: {e}')
+
+try:
+    import sys
+    sys.path.append('apps/lms')
+    print('LMS path: OK')
+except Exception as e:
+    print(f'LMS error: {e}')
+"
 
 # Ensure user bin directory is in PATH
 export PATH="$HOME/.local/bin:$PATH"

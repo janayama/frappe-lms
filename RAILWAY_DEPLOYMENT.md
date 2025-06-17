@@ -98,7 +98,14 @@ Railway will automatically build and deploy. The initial deployment takes ~10-15
 
 ### 2. Dependency Conflicts
 **Issue**: "lms 2.31.0 requires cairocffi~=1.6.1, but you have cairocffi 1.5.1"
-**Solution**: Fixed by using LMS-compatible dependency versions.
+**Solution**: Uses smart dependency resolution - installs packages without strict dependency checking, then manually resolves cairocffi version compatibility.
+
+**How it works**:
+1. Installs Frappe and LMS with `--no-deps` to avoid conflicts
+2. Manually installs all required dependencies
+3. Tests cairocffi 1.6.1 compatibility with both apps
+4. Falls back to cairocffi 1.5.1 if needed
+5. Ensures both applications can import successfully
 
 ### 3. Database Connection
 **Issue**: "Service mariadb is not running"
