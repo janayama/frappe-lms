@@ -52,43 +52,35 @@ if [ ! -d "sites/$SITE_NAME" ]; then
         echo "Getting LMS app..."
         bench get-app lms
     fi
-
-    # Create site directory and config manually
-    mkdir -p "sites/$SITE_NAME"
-    cat > "sites/$SITE_NAME/site_config.json" <<EOF
-{
-    "db_name": "$DB_NAME",
-    "db_password": "$DB_PASSWORD",
-    "db_host": "$DB_HOST",
-    "db_port": $DB_PORT,
-    "db_type": "mysql"
-}
-EOF
-    echo "Created site_config.json."
-
-    # Add site to sites.txt for Frappe to recognize it
-    echo "$SITE_NAME" > sites/sites.txt
-    echo "Updated sites.txt."
     
-    # Install the LMS app on the new site. This will create the database tables.
+    # Use 'bench new-site' which is the correct way to create a site and admin user
+    bench new-site "$SITE_NAME" \
+        --db-type mysql \
+        --db-host "$DB_HOST" \
+        --db-port "$DB_PORT" \
+        --db-name "$DB_NAME" \
+        --db-user "$DB_USER" \
+        --db-password "$DB_PASSWORD" \
+        --admin-password "$ADMIN_PASSWORD" \
+        --force
+
+    # Install the LMS app on the new site.
     echo "Installing LMS app on site..."
-    bench --site "$SITE_NAME" install-app lms --admin-password "$ADMIN_PASSWORD"
+    bench --site "$SITE_NAME" install-app lms
     
     # Finalize site setup
     bench --site "$SITE_NAME" set-config developer_mode 0
-    bench use "$SITE_NAME" # This sets it as the default site
+    bench use "$SITE_NAME"
     bench --site "$SITE_NAME" clear-cache
     echo "Site '$SITE_NAME' created successfully."
 else
     echo "Site '$SITE_NAME' already exists. Skipping creation."
 fi
 
-# 6. Start the production server
+# 6. Start the production server using gunicorn directly
 echo "Starting Gunicorn production server on port $APP_PORT..."
-# Use 'exec' to replace this script's process with the Gunicorn process
-exec bench exec gunicorn \
-    --chdir="sites" \
-    --bind="0.0.0.0:$APP_port" \
+exec gunicorn \
+    --bind="0.0.0.0:$APP_PORT" \
     --workers=2 \
     --threads=4 \
     --worker-class=gthread \
