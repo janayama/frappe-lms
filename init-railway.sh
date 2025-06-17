@@ -41,6 +41,12 @@ bench set-config -g db_port "$DB_PORT"
 # This new setting is crucial for Railway health checks
 echo "Enabling default site to handle health checks..."
 bench set-config -g serve_default_site true
+
+# **FIX**: Add db_init_commands to the GLOBAL config to disable strict SQL mode.
+# This MUST be run BEFORE 'new-site' is called.
+echo "Disabling strict SQL mode globally for installation..."
+bench set-config -g db_init_commands "SET SESSION sql_mode = 'NO_ENGINE_SUBSTITUTION'"
+
 bench set-redis-cache-host "redis://localhost:6379"
 bench set-redis-queue-host "redis://localhost:6379"
 bench set-redis-socketio-host "redis://localhost:6379"
@@ -60,18 +66,11 @@ if ! bench --site "$SITE_NAME" list-apps >/dev/null 2>&1; then
     # Use 'bench new-site' which is the correct way to create a site and admin user
     bench new-site "$SITE_NAME" \
         --db-type mariadb \
-        --db-host "$DB_HOST" \
-        --db-port "$DB_PORT" \
         --mariadb-root-username "$DB_USER" \
         --mariadb-root-password "$DB_PASSWORD" \
         --admin-password "$ADMIN_PASSWORD" \
         --force \
         --no-mariadb-socket
-
-    # **FIX**: Add db_init_commands to site_config.json to disable strict SQL mode
-    # This is required to prevent errors with TEXT/BLOB columns having default values.
-    echo "Disabling strict SQL mode for installation..."
-    bench --site "$SITE_NAME" set-config -g db_init_commands "SET SESSION sql_mode = 'NO_ENGINE_SUBSTITUTION'"
 
     # Install the LMS app on the new site.
     echo "Installing LMS app on site..."
