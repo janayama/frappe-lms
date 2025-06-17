@@ -2,7 +2,7 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
-echo "=== Frappe LMS Railway Production Setup - FINAL FIX ==="
+echo "=== Frappe LMS Railway Production Setup - FINAL COMBINED FIX ==="
 
 # Set environment variables
 export SITE_NAME="${SITE_NAME:-lms.railway.app}"
@@ -27,31 +27,19 @@ until mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" -e "SELECT 1
 done
 echo "Database connection successful!"
 
-# 3. Configure MySQL CLI client to use the correct remote host for all subprocesses.
-# This is the definitive fix for the 'Access denied' error during installation.
-echo "Configuring MySQL client with .my.cnf..."
-cat > /home/frappe/.my.cnf <<EOF
-[client]
-host = ${DB_HOST}
-port = ${DB_PORT}
-user = ${DB_USER}
-password = "${DB_PASSWORD}"
-EOF
-echo "MySQL client configured."
-
-# 4. Aggressive Cleanup: Ensure a completely clean slate.
+# 3. Aggressive Cleanup: Ensure a completely clean slate.
 if [ -d "frappe-bench" ]; then
-    echo "Found existing 'frappe-bench' directory. Wiping it to ensure a clean install."
+    echo "Found existing 'frappe-bench' directory. Wiping it completely."
     rm -rf frappe-bench
 fi
 
-# 5. Initialize Frappe Bench from scratch
+# 4. Initialize Frappe Bench from scratch
 echo "Creating new Frappe bench from a clean slate..."
 bench init --skip-redis-config-generation frappe-bench
 echo "Bench initialization complete."
 cd frappe-bench
 
-# 6. Manually patch Frappe source code
+# 5. Manually patch Frappe source code for BLOB/TEXT error
 echo "Patching Frappe source for compatibility with modern MySQL..."
 python3 -c "
 import json, os, sys
@@ -73,15 +61,19 @@ except Exception as e:
     sys.exit(1)
 "
 
-# 7. Create and install site
+# 6. Create and install site
 if ! bench --site "$SITE_NAME" list-apps >/dev/null 2>&1; then
     echo "Site '$SITE_NAME' not installed. Starting installation..."
-    # No longer need to pass root credentials; they are in .my.cnf
+
+    # Create the site using all necessary flags to prevent interactive prompts AND access denied errors.
     bench new-site "$SITE_NAME" \
         --db-type mariadb \
         --db-name "$DB_NAME" \
+        --mariadb-root-username "$DB_USER" \
+        --mariadb-root-password "$DB_PASSWORD" \
         --admin-password "$ADMIN_PASSWORD" \
-        --force
+        --force \
+        --mariadb-user-host-login-scope '%'
     
     bench get-app lms
     bench --site "$SITE_NAME" install-app lms
@@ -95,7 +87,7 @@ else
     echo "Site '$SITE_NAME' already installed. Skipping creation."
 fi
 
-# 8. Start production server
+# 7. Start production server
 echo "Starting Gunicorn production server on port $APP_PORT..."
 exec ./env/bin/gunicorn \
     --bind="0.0.0.0:$APP_PORT" \
