@@ -114,17 +114,39 @@ echo "Using system Python (skipping virtual environment for Railway compatibilit
 echo "Installing Frappe and LMS dependencies..."
 pip3 install --user --upgrade pip
 
-# Install Frappe first with its specific dependencies
-echo "Installing Frappe framework..."
-pip3 install --user -e apps/frappe
+# Clean up any existing conflicting packages
+echo "Cleaning up existing packages to avoid conflicts..."
+pip3 uninstall -y cairocffi lxml markdown fuzzywuzzy websocket_client razorpay 2>/dev/null || echo "No conflicting packages to remove"
 
-# Fix the cairocffi version conflict by forcing the version Frappe needs
-echo "Fixing dependency conflicts..."
-pip3 install --user --force-reinstall cairocffi==1.5.1
+# Create a temporary requirements file with exact versions to avoid conflicts
+echo "Creating requirements file with compatible versions..."
+cat > /tmp/requirements.txt << 'EOF'
+# Core Frappe dependencies with exact versions
+cairocffi==1.5.1
+lxml==4.9.4
+markdown==3.5.2
+fuzzywuzzy==0.18.0
+websocket_client==1.6.4
+razorpay==1.4.2
 
-# Now install LMS
-echo "Installing LMS application..."
-pip3 install --user -e apps/lms
+# Install frappe first
+-e apps/frappe
+
+# Then install LMS with --no-deps to avoid conflicts
+EOF
+
+# Install using the requirements file
+echo "Installing packages with controlled dependencies..."
+pip3 install --user -r /tmp/requirements.txt
+
+# Install LMS separately with --no-deps to prevent it from overriding dependencies
+echo "Installing LMS application without dependency resolution..."
+pip3 install --user --no-deps -e apps/lms
+
+# Verify the installation
+echo "Verifying installation..."
+python3 -c "import frappe; print(f'Frappe version: {frappe.__version__}')" || echo "Frappe import failed"
+python3 -c "import lms; print('LMS imported successfully')" || echo "LMS import failed"
 
 # Ensure user bin directory is in PATH
 export PATH="$HOME/.local/bin:$PATH"

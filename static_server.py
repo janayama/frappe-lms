@@ -109,6 +109,7 @@ def create_app():
         
     except ImportError as e:
         print(f"Failed to import Frappe application: {e}")
+        print("This might be due to dependency conflicts or missing packages")
         # Fallback simple app if Frappe not available
         def simple_app(environ, start_response):
             path = environ.get('PATH_INFO', '/')
@@ -122,7 +123,7 @@ def create_app():
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Frappe LMS - Starting</title>
+                <title>Frappe LMS - Dependency Issue</title>
                 <style>
                     body {{ font-family: Arial, sans-serif; margin: 40px; }}
                     .container {{ max-width: 600px; margin: 0 auto; }}
@@ -131,29 +132,43 @@ def create_app():
             </head>
             <body>
                 <div class="container">
-                    <h1>Frappe LMS is Starting...</h1>
-                    <p>The application is initializing. Frappe framework import failed.</p>
+                    <h1>Frappe LMS - Installation Issue</h1>
+                    <p>The application is experiencing dependency conflicts.</p>
                     <div class="error">
                         <h3>Debug Information:</h3>
                         <p><strong>Path requested:</strong> {path}</p>
                         <p><strong>Import error:</strong> {e}</p>
                         <p><strong>Site:</strong> {os.environ.get('SITE_NAME', 'Not set')}</p>
+                        <p><strong>Likely cause:</strong> Dependency version conflicts (cairocffi, lxml, etc.)</p>
                     </div>
-                    <p>Please wait while the system completes initialization...</p>
+                    <p>Please check the deployment logs for dependency resolution errors.</p>
                 </div>
             </body>
             </html>
             '''
             return [html.encode('utf-8')]
         frappe_app = simple_app
-    
+        
     except Exception as e:
-        print(f"Unexpected error importing Frappe: {e}")
+        print(f"Unexpected error during Frappe initialization: {e}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        
         def error_app(environ, start_response):
             status = '500 Internal Server Error'
             headers = [('Content-Type', 'text/html')]
             start_response(status, headers)
-            return [f'<h1>Server Error</h1><p>Error: {e}</p>'.encode('utf-8')]
+            error_html = f'''
+            <html>
+            <head><title>Frappe Initialization Error</title></head>
+            <body>
+                <h1>Frappe Initialization Error</h1>
+                <p>Error during Frappe setup: {e}</p>
+                <p>Check logs for full traceback.</p>
+            </body>
+            </html>
+            '''
+            return [error_html.encode('utf-8')]
         frappe_app = error_app
     
     # Get site name for static paths
