@@ -2,7 +2,7 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
-echo "=== Frappe LMS Railway Production Setup - Combined Fix ==="
+echo "=== Frappe LMS Railway Production Setup - FINAL FIX ==="
 
 # Set environment variables
 export SITE_NAME="${SITE_NAME:-lms.railway.app}"
@@ -27,36 +27,29 @@ until mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" -e "SELECT 1
 done
 echo "Database connection successful!"
 
-# 3. Aggressive Cleanup: Ensure a completely clean slate.
+# 3. Configure MySQL CLI client to use the correct remote host for all subprocesses.
+# This is the definitive fix for the 'Access denied' error during installation.
+echo "Configuring MySQL client with .my.cnf..."
+cat > /home/frappe/.my.cnf <<EOF
+[client]
+host = ${DB_HOST}
+port = ${DB_PORT}
+user = ${DB_USER}
+password = "${DB_PASSWORD}"
+EOF
+echo "MySQL client configured."
+
+# 4. Aggressive Cleanup: Ensure a completely clean slate.
 if [ -d "frappe-bench" ]; then
-    echo "Found existing 'frappe-bench' directory. Wiping it completely to ensure a clean install."
+    echo "Found existing 'frappe-bench' directory. Wiping it to ensure a clean install."
     rm -rf frappe-bench
 fi
 
-# 4. Initialize Frappe Bench from scratch
+# 5. Initialize Frappe Bench from scratch
 echo "Creating new Frappe bench from a clean slate..."
 bench init --skip-redis-config-generation frappe-bench
 echo "Bench initialization complete."
 cd frappe-bench
-
-# 5. Manually create the global config BEFORE running new-site.
-echo "Creating global config (common_site_config.json)..."
-python3 -c "
-import json, os
-config_path = 'sites/common_site_config.json'
-config = {
-    'db_host': os.environ.get('MYSQLHOST'),
-    'db_port': int(os.environ.get('MYSQLPORT', 3306)),
-    'redis_cache': 'redis://localhost:6379',
-    'redis_queue': 'redis://localhost:6379',
-    'redis_socketio': 'redis://localhost:6379',
-    'serve_default_site': True,
-    'db_init_commands': \"SET SESSION sql_mode = 'NO_ENGINE_SUBSTITUTION'\"
-}
-with open(config_path, 'w') as f:
-    json.dump(config, f, indent=2)
-print('Global config created.')
-"
 
 # 6. Manually patch Frappe source code
 echo "Patching Frappe source for compatibility with modern MySQL..."
@@ -83,19 +76,18 @@ except Exception as e:
 # 7. Create and install site
 if ! bench --site "$SITE_NAME" list-apps >/dev/null 2>&1; then
     echo "Site '$SITE_NAME' not installed. Starting installation..."
+    # No longer need to pass root credentials; they are in .my.cnf
     bench new-site "$SITE_NAME" \
         --db-type mariadb \
         --db-name "$DB_NAME" \
-        --mariadb-root-username "$DB_USER" \
-        --mariadb-root-password "$DB_PASSWORD" \
         --admin-password "$ADMIN_PASSWORD" \
-        --force \
-        --mariadb-user-host-login-scope '%'
-
+        --force
+    
     bench get-app lms
     bench --site "$SITE_NAME" install-app lms
     
     bench --site "$SITE_NAME" set-config developer_mode 0
+    bench --site "$SITE_NAME" set-config -g serve_default_site true
     bench use "$SITE_NAME"
     bench --site "$SITE_NAME" clear-cache
     echo "Site '$SITE_NAME' created and installed successfully."
