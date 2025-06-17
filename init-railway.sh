@@ -34,50 +34,44 @@ if [ ! -d "frappe-bench" ]; then
 fi
 cd frappe-bench
 
-# 4. Manually create the global config BEFORE running new-site.
-# This ensures new-site uses our settings for its first connection.
-echo "Creating/updating global config (common_site_config.json)..."
+# 4. Manually patch Frappe source code to fix TEXT default value issue.
+echo "Patching Frappe source for compatibility with modern MySQL..."
 python3 -c "
 import json
 import os
-config_path = 'sites/common_site_config.json'
-if os.path.exists(config_path):
-    with open(config_path, 'r') as f:
-        config = json.load(f)
-else:
-    config = {}
-
-# Set global DB connection and health check settings
-config['db_host'] = os.environ.get('MYSQLHOST')
-config['db_port'] = int(os.environ.get('MYSQLPORT', 3306))
-config['serve_default_site'] = True
-# ** THE CRITICAL FIX **: Set SQL mode for the session.
-config['db_init_commands'] = \"SET SESSION sql_mode = 'NO_ENGINE_SUBSTITUTION'\"
-# Set Redis config
-config['redis_cache'] = 'redis://localhost:6379'
-config['redis_queue'] = 'redis://localhost:6379'
-config['redis_socketio'] = 'redis://localhost:6379'
-
-with open(config_path, 'w') as f:
-    json.dump(config, f, indent=2)
-
-print('--- common_site_config.json contents ---')
-with open(config_path, 'r') as f:
-    print(f.read())
-print('----------------------------------------')
-print('Global config updated.')
+import sys
+# Path to the file that defines the 'Workspace' DocType.
+workspace_json_path = 'apps/frappe/frappe/core/doctype/workspace/workspace.json'
+if not os.path.exists(workspace_json_path):
+    print(f'Error: Could not find {{workspace_json_path}} to patch.', file=sys.stderr)
+    sys.exit(1)
+try:
+    with open(workspace_json_path, 'r') as f:
+        doc = json.load(f)
+    # Find the 'content' field and remove the 'default' key if it exists.
+    for field in doc.get('fields', []):
+        if field.get('fieldname') == 'content' and 'default' in field:
+            print(\"Found and removing 'default' from 'content' field in workspace.json\")
+            del field['default']
+            break # Stop after finding the field
+    # Write the patched file back.
+    with open(workspace_json_path, 'w') as f:
+        json.dump(doc, f, indent=1)
+    print('Successfully patched workspace.json.')
+except Exception as e:
+    print(f'Error patching workspace.json: {{e}}', file=sys.stderr)
+    sys.exit(1)
 "
 
 # 5. Create and install site only if it's not already installed properly.
 if ! bench --site "$SITE_NAME" list-apps >/dev/null 2>&1; then
     echo "Site '$SITE_NAME' is not installed correctly. Starting full installation..."
-
-    if [ ! -d "apps/lms" ]; then
-        echo "Getting LMS app..."
-        bench get-app lms
-    fi
     
-    # new-site will now read the global config we just created
+    # We don't need the LMS app for the initial site creation
+    # bench get-app lms
+    
+    # new-site will now use the patched source code.
+    # We no longer need the sql_mode fix as we've fixed the root cause.
     bench new-site "$SITE_NAME" \
         --db-type mariadb \
         --mariadb-root-username "$DB_USER" \
@@ -87,9 +81,13 @@ if ! bench --site "$SITE_NAME" list-apps >/dev/null 2>&1; then
         --no-mariadb-socket
 
     echo "Installing LMS app on site..."
+    # Now get and install the LMS app after the main site is up.
+    bench get-app lms
     bench --site "$SITE_NAME" install-app lms
     
     bench --site "$SITE_NAME" set-config developer_mode 0
+    # Also set the default site config for health checks here.
+    bench set-config -g serve_default_site true
     bench use "$SITE_NAME"
     bench --site "$SITE_NAME" clear-cache
     echo "Site '$SITE_NAME' created and installed successfully."
