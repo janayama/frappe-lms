@@ -21,6 +21,7 @@ USER frappe
 WORKDIR /home/frappe
 
 # Copy custom files
+USER root
 COPY entrypoint.sh /home/frappe/frappe-bench/
 COPY healthcheck.sh /home/frappe/frappe-bench/
 COPY init_frappe.py /home/frappe/frappe-bench/
@@ -34,6 +35,9 @@ RUN chmod +x /home/frappe/frappe-bench/entrypoint.sh \
     /home/frappe/frappe-bench/healthcheck.sh \
     /home/frappe/frappe-bench/init_frappe.py \
     /home/frappe/frappe-bench/static_server.py
+
+# Switch back to frappe user for runtime
+USER frappe
 
 # Set the working directory
 WORKDIR /home/frappe/frappe-bench
