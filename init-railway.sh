@@ -57,7 +57,7 @@ if ! bench --site "$SITE_NAME" list-apps >/dev/null 2>&1; then
         bench get-app lms
     fi
     
-    # Use 'bench new-site' with root credentials to avoid interactive prompts
+    # Use 'bench new-site' which is the correct way to create a site and admin user
     bench new-site "$SITE_NAME" \
         --db-type mariadb \
         --db-host "$DB_HOST" \
@@ -67,6 +67,11 @@ if ! bench --site "$SITE_NAME" list-apps >/dev/null 2>&1; then
         --admin-password "$ADMIN_PASSWORD" \
         --force \
         --no-mariadb-socket
+
+    # **FIX**: Add db_init_commands to site_config.json to disable strict SQL mode
+    # This is required to prevent errors with TEXT/BLOB columns having default values.
+    echo "Disabling strict SQL mode for installation..."
+    bench --site "$SITE_NAME" set-config -g db_init_commands "SET SESSION sql_mode = 'NO_ENGINE_SUBSTITUTION'"
 
     # Install the LMS app on the new site.
     echo "Installing LMS app on site..."
