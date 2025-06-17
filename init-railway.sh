@@ -1,123 +1,96 @@
 #!/bin/bash
-
-# Exit on any error
+# Exit immediately if a command exits with a non-zero status.
 set -e
 
-echo "=== Frappe LMS Railway Setup ==="
-echo "Site: ${SITE_NAME:-lms.railway.app}"
-echo "Database: ${MYSQLHOST:-localhost}:${MYSQLPORT:-3306}"
-echo "Port: ${PORT:-8000}"
+echo "=== Frappe LMS Railway Production Setup ==="
 
-# Set environment variables with defaults
+# Set environment variables with defaults for Railway
 export SITE_NAME="${SITE_NAME:-lms.railway.app}"
 export DB_HOST="${MYSQLHOST:-localhost}"
 export DB_PORT="${MYSQLPORT:-3306}"
 export DB_NAME="${MYSQLDATABASE:-railway}"
-export DB_USER="${MYSQLUSER:-root}"
+export DB_USER="${MYSQLUSER}"
 export DB_PASSWORD="${MYSQLPASSWORD}"
 export ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin}"
 export APP_PORT="${PORT:-8000}"
 
-# Wait for database to be ready
+# 1. Start Redis Server in the background
+echo "Starting Redis server..."
+redis-server --daemonize yes
+echo "Redis started."
+
+# 2. Wait for Database to be ready
 echo "Waiting for database connection..."
 until mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" -e "SELECT 1" >/dev/null 2>&1; do
-    echo "Database not ready, waiting..."
+    echo "Database not ready, retrying in 2 seconds..."
     sleep 2
 done
 echo "Database connection successful!"
 
-# Check if bench already exists
-if [ -d "/home/frappe/frappe-bench/apps/frappe" ]; then
-    echo "Bench already exists, starting application..."
-    cd frappe-bench
-    
-    # Update site configuration for Railway
-    if [ -f "sites/${SITE_NAME}/site_config.json" ]; then
-        echo "Updating site configuration..."
-        # Update the site config with current environment variables
-        python3 -c "
-import json
-import os
-
-config_file = 'sites/${SITE_NAME}/site_config.json'
-if os.path.exists(config_file):
-    with open(config_file, 'r') as f:
-        config = json.load(f)
-    
-    # Update database connection
-    config.update({
-        'db_host': '${DB_HOST}',
-        'db_port': ${DB_PORT},
-        'db_name': '${DB_NAME}',
-        'db_password': '${DB_PASSWORD}'
-    })
-    
-    with open(config_file, 'w') as f:
-        json.dump(config, f, indent=2)
-    
-    print('Site configuration updated')
-"
-    fi
-    
-    # Start the application
-    echo "Starting Frappe web server..."
-    # Use bench serve for single process (Railway compatible)
-    # bench start runs multiple processes which doesn't work well on Railway
-    bench serve --port $APP_PORT
-else
-    echo "Creating new bench..."
-    
-    # Initialize bench without Redis config (we'll configure it manually)
+# 3. Initialize Frappe Bench if it doesn't exist
+if [ ! -d "frappe-bench" ]; then
+    echo "Creating new Frappe bench..."
     bench init --skip-redis-config-generation frappe-bench
+fi
+cd frappe-bench
+
+# 4. Configure bench for our environment
+echo "Configuring bench..."
+bench set-config -g db_host "$DB_HOST"
+bench set-config -g db_port "$DB_PORT"
+bench set-redis-cache-host "redis://localhost:6379"
+bench set-redis-queue-host "redis://localhost:6379"
+bench set-redis-socketio-host "redis://localhost:6379"
+echo "Bench configuration complete."
+
+# 5. Create the site if it doesn't exist
+if [ ! -d "sites/$SITE_NAME" ]; then
+    echo "Site '$SITE_NAME' not found. Creating it..."
+
+    # Get LMS app if it's not already there
+    if [ ! -d "apps/lms" ]; then
+        echo "Getting LMS app..."
+        bench get-app lms
+    fi
+
+    # Create site directory and config manually
+    mkdir -p "sites/$SITE_NAME"
+    cat > "sites/$SITE_NAME/site_config.json" <<EOF
+{
+    "db_name": "$DB_NAME",
+    "db_password": "$DB_PASSWORD",
+    "db_host": "$DB_HOST",
+    "db_port": $DB_PORT,
+    "db_type": "mysql"
+}
+EOF
+    echo "Created site_config.json."
+
+    # Add site to sites.txt for Frappe to recognize it
+    echo "$SITE_NAME" > sites/sites.txt
+    echo "Updated sites.txt."
     
-    cd frappe-bench
-    
-    # Configure database connection for Railway MySQL
-    echo "Configuring database connection..."
-    bench set-config -g db_host "$DB_HOST"
-    bench set-config -g db_port "$DB_PORT"
-    
-    # Configure Redis (use localhost since we're not using containers)
-    bench set-redis-cache-host redis://localhost:6379
-    bench set-redis-queue-host redis://localhost:6379  
-    bench set-redis-socketio-host redis://localhost:6379
-    
-    # Start Redis server in background
-    echo "Starting Redis server..."
-    redis-server --daemonize yes --port 6379 --maxmemory 256mb --maxmemory-policy allkeys-lru
-    
-    # Wait for Redis to start
-    sleep 2
-    
-    # Get LMS app
-    echo "Installing LMS app..."
-    bench get-app lms
-    
-    # Create new site
-    echo "Creating site: $SITE_NAME"
-    bench new-site "$SITE_NAME" \
-        --force \
-        --db-host "$DB_HOST" \
-        --db-port "$DB_PORT" \
-        --db-name "$DB_NAME" \
-        --db-password "$DB_PASSWORD" \
-        --admin-password "$ADMIN_PASSWORD" \
-        --no-mariadb-socket
-    
-    # Install LMS app on the site
+    # Install the LMS app on the new site. This will create the database tables.
     echo "Installing LMS app on site..."
-    bench --site "$SITE_NAME" install-app lms
+    bench --site "$SITE_NAME" install-app lms --admin-password "$ADMIN_PASSWORD"
     
-    # Configure the site
+    # Finalize site setup
     bench --site "$SITE_NAME" set-config developer_mode 0
+    bench use "$SITE_NAME" # This sets it as the default site
     bench --site "$SITE_NAME" clear-cache
-    bench use "$SITE_NAME"
-    
-    echo "Setup completed successfully!"
-    
-    # Start the application
-    echo "Starting Frappe web server..."
-    # Use bench serve for single process (Railway compatible)
-    # bench start runs multiple processes which doesn't work well on Railway
-    bench serve --port $APP_PORT
-fi 
+    echo "Site '$SITE_NAME' created successfully."
+else
+    echo "Site '$SITE_NAME' already exists. Skipping creation."
+fi
+
+# 6. Start the production server
+echo "Starting Gunicorn production server on port $APP_PORT..."
+# Use 'exec' to replace this script's process with the Gunicorn process
+exec bench exec gunicorn \
+    --chdir="sites" \
+    --bind="0.0.0.0:$APP_port" \
+    --workers=2 \
+    --threads=4 \
+    --worker-class=gthread \
+    --preload \
+    frappe.app:application 
