@@ -38,14 +38,18 @@ cd frappe-bench
 echo "Configuring bench..."
 bench set-config -g db_host "$DB_HOST"
 bench set-config -g db_port "$DB_PORT"
+# This new setting is crucial for Railway health checks
+echo "Enabling default site to handle health checks..."
+bench set-config -g serve_default_site true
 bench set-redis-cache-host "redis://localhost:6379"
 bench set-redis-queue-host "redis://localhost:6379"
 bench set-redis-socketio-host "redis://localhost:6379"
 echo "Bench configuration complete."
 
-# 5. Create the site if it doesn't exist
-if [ ! -d "sites/$SITE_NAME" ]; then
-    echo "Site '$SITE_NAME' not found. Creating it..."
+# 5. Create and install site only if it's not already installed properly.
+# We check by trying to list apps. If it fails, the site needs installation.
+if ! bench --site "$SITE_NAME" list-apps >/dev/null 2>&1; then
+    echo "Site '$SITE_NAME' is not installed correctly. Starting full installation..."
 
     # Get LMS app if it's not already there
     if [ ! -d "apps/lms" ]; then
@@ -53,12 +57,11 @@ if [ ! -d "sites/$SITE_NAME" ]; then
         bench get-app lms
     fi
     
-    # Use 'bench new-site' which is the correct way to create a site and admin user
+    # Use 'bench new-site' with root credentials to avoid interactive prompts
     bench new-site "$SITE_NAME" \
         --db-type mariadb \
         --db-host "$DB_HOST" \
         --db-port "$DB_PORT" \
-        --db-name "$DB_NAME" \
         --mariadb-root-username "$DB_USER" \
         --mariadb-root-password "$DB_PASSWORD" \
         --admin-password "$ADMIN_PASSWORD" \
@@ -73,12 +76,12 @@ if [ ! -d "sites/$SITE_NAME" ]; then
     bench --site "$SITE_NAME" set-config developer_mode 0
     bench use "$SITE_NAME"
     bench --site "$SITE_NAME" clear-cache
-    echo "Site '$SITE_NAME' created successfully."
+    echo "Site '$SITE_NAME' created and installed successfully."
 else
-    echo "Site '$SITE_NAME' already exists. Skipping creation."
+    echo "Site '$SITE_NAME' already installed. Skipping creation."
 fi
 
-# 6. Start the production server using gunicorn directly
+# 6. Start the production server using gunicorn
 echo "Starting Gunicorn production server on port $APP_PORT..."
 exec ./env/bin/gunicorn \
     --bind="0.0.0.0:$APP_PORT" \
