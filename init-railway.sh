@@ -112,7 +112,11 @@ print('Patching process complete.')
 
 # 7. Manually create site configuration to bypass problematic user creation in new-site
 echo "Manually creating site config for '$SITE_NAME' to bypass new-site helper..."
-mkdir -p "sites/$SITE_NAME"
+# Create the site directory and the necessary subdirectories for logs and files
+mkdir -p "sites/$SITE_NAME/logs"
+mkdir -p "sites/$SITE_NAME/public/files"
+mkdir -p "sites/$SITE_NAME/private/files"
+
 python3 -c "
 import json, os
 config_path = 'sites/$SITE_NAME/site_config.json'
