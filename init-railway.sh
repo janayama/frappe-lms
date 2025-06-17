@@ -27,9 +27,9 @@ until mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" -e "SELECT 1
 done
 echo "Database connection successful!"
 
-# 3. Sanity check for Frappe installation. If it's incomplete, wipe it and start over.
-if [ -d "frappe-bench" ] && [ ! -d "frappe-bench/apps/frappe" ]; then
-    echo "Found an incomplete 'frappe-bench' directory. Wiping it to ensure a clean install."
+# 3. Sanity check for Frappe installation. If it's incomplete, wipe it to ensure a clean install.
+if [ -d "frappe-bench" ] && [ ! -s "frappe-bench/apps/frappe/setup.py" ]; then
+    echo "Found an incomplete 'frappe-bench' directory (key file missing). Wiping it to ensure a clean install."
     rm -rf frappe-bench
 fi
 
@@ -37,10 +37,20 @@ fi
 if [ ! -d "frappe-bench" ]; then
     echo "Creating new Frappe bench..."
     bench init --skip-redis-config-generation frappe-bench
+    echo "Bench initialization complete."
 fi
 cd frappe-bench
 
-# 5. Manually patch Frappe source code to fix TEXT default value issue.
+# 5. DIAGNOSTICS: Check filesystem state before attempting to patch.
+echo "--- DIAGNOSTICS START ---"
+echo "Current directory is: $(pwd)"
+echo "Listing contents of 'apps' directory..."
+ls -la apps || echo "Warning: 'apps' directory not found."
+echo "Listing contents of 'apps/frappe' directory..."
+ls -la apps/frappe || echo "Warning: 'apps/frappe' directory not found."
+echo "--- DIAGNOSTICS END ---"
+
+# 6. Manually patch Frappe source code to fix TEXT default value issue.
 echo "Patching Frappe source for compatibility with modern MySQL..."
 python3 -c "
 import json
@@ -49,7 +59,7 @@ import sys
 # Path to the file that defines the 'Workspace' DocType.
 workspace_json_path = 'apps/frappe/frappe/core/doctype/workspace/workspace.json'
 if not os.path.exists(workspace_json_path):
-    print(f'Error: Could not find {workspace_json_path} to patch.', file=sys.stderr)
+    print(f'Error: Could not find {workspace_json_path} to patch. The Frappe app may not be installed correctly.', file=sys.stderr)
     sys.exit(1)
 try:
     with open(workspace_json_path, 'r') as f:
@@ -69,7 +79,7 @@ except Exception as e:
     sys.exit(1)
 "
 
-# 6. Create and install site only if it's not already installed properly.
+# 7. Create and install site only if it's not already installed properly.
 if ! bench --site "$SITE_NAME" list-apps >/dev/null 2>&1; then
     echo "Site '$SITE_NAME' is not installed correctly. Starting full installation..."
     
@@ -96,7 +106,7 @@ else
     echo "Site '$SITE_NAME' already installed. Skipping creation."
 fi
 
-# 7. Start the production server using gunicorn
+# 8. Start the production server using gunicorn
 echo "Starting Gunicorn production server on port $APP_PORT..."
 exec ./env/bin/gunicorn \
     --bind="0.0.0.0:$APP_PORT" \
