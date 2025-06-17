@@ -16,14 +16,7 @@ class StaticFileMiddleware:
         method = environ.get('REQUEST_METHOD', 'GET')
         print(f"Processing request: {method} /{path}")
         
-        # Check if this is a request for a static file
-        for static_path in self.static_paths:
-            file_path = Path(static_path) / path
-            if file_path.exists() and file_path.is_file():
-                print(f"Serving static file: {file_path}")
-                return self.serve_static_file(file_path, environ, start_response)
-        
-        # Special handling for health check
+        # Special handling for health check first
         if path == 'health':
             site_name = os.environ.get('SITE_NAME', 'site1.local')
             health_file = Path(f'sites/{site_name}/public/health')
@@ -31,9 +24,34 @@ class StaticFileMiddleware:
                 print(f"Serving health check: {health_file}")
                 return self.serve_static_file(health_file, environ, start_response)
         
-        # Pass to the main application
-        print(f"Passing to main application: /{path}")
-        return self.app(environ, start_response)
+        # Check if this is a request for a static file
+        for static_path in self.static_paths:
+            file_path = Path(static_path) / path
+            if file_path.exists() and file_path.is_file():
+                print(f"Serving static file: {file_path}")
+                return self.serve_static_file(file_path, environ, start_response)
+        
+        # For root path or any other path, pass to Frappe
+        print(f"Passing to Frappe application: /{path}")
+        try:
+            return self.app(environ, start_response)
+        except Exception as e:
+            print(f"Error in Frappe application: {e}")
+            # Return a proper error response
+            status = '500 Internal Server Error'
+            headers = [('Content-Type', 'text/html')]
+            start_response(status, headers)
+            error_html = f'''
+            <html>
+            <head><title>Application Error</title></head>
+            <body>
+                <h1>Application Error</h1>
+                <p>Error processing request: {e}</p>
+                <p>Path: /{path}</p>
+            </body>
+            </html>
+            '''
+            return [error_html.encode('utf-8')]
     
     def serve_static_file(self, file_path, environ, start_response):
         """Serve a static file"""
@@ -75,10 +93,19 @@ def create_app():
         
         # Set up Frappe environment
         import os
-        os.environ.setdefault('FRAPPE_SITE', os.environ.get('SITE_NAME', 'site1.local'))
+        site_name = os.environ.get('SITE_NAME', 'site1.local')
+        os.environ.setdefault('FRAPPE_SITE', site_name)
+        
+        # Initialize Frappe
+        print(f"Initializing Frappe for site: {site_name}")
+        import frappe
+        
+        # Set the current site
+        frappe.init(site=site_name)
+        frappe.connect()
         
         from frappe.app import application as frappe_app
-        print("Successfully imported Frappe application!")
+        print("Successfully imported and initialized Frappe application!")
         
     except ImportError as e:
         print(f"Failed to import Frappe application: {e}")
