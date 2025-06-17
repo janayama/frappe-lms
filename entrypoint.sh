@@ -61,142 +61,60 @@ wait_for_service "Redis" \
 # Ensure we're in the correct directory
 cd /home/frappe
 
-# Check if bench is already initialized
-if [ ! -d "frappe-bench" ] || [ ! -f "frappe-bench/sites/common_site_config.json" ] || [ ! -d "frappe-bench/apps" ]; then
-    echo "Initializing bench (directory missing or incomplete)..."
-    
-    # If bench directory exists but is incomplete, just ensure we have the basic structure
-    if [ -d "frappe-bench" ]; then
-        echo "Bench directory exists but is incomplete, fixing structure..."
-        cd frappe-bench
-        
-        # Ensure basic directories exist
-        mkdir -p sites
-        mkdir -p apps
-        mkdir -p logs
-        mkdir -p config
-        
-        # If apps directory is empty, we need to get frappe
-        if [ ! -d "apps/frappe" ]; then
-            echo "Getting Frappe framework..."
-            git clone https://github.com/frappe/frappe.git apps/frappe --depth 1
-        fi
-        
-        # If no virtual environment exists, create one
-        if [ ! -d "env" ]; then
-            echo "Creating virtual environment..."
-            python3 -m venv env
-            source env/bin/activate
-            pip install -e apps/frappe
-        fi
-        
-        BENCH_DIR="frappe-bench"
-    else
-        # Initialize bench from scratch
-        bench init --skip-redis-config-generation --python python3 frappe-bench
-        cd frappe-bench
-        BENCH_DIR="frappe-bench"
-    fi
-    
-    # Configure database connection
-    echo "Configuring database connection..."
-    # bench set-mariadb-host "$DB_HOST"
-    # bench set-mariadb-port "$DB_PORT"
-    
-    # Configure Redis
-    echo "Configuring Redis..."
-    # bench set-redis-cache-host redis://localhost:6379
-    # bench set-redis-queue-host redis://localhost:6379
-    # bench set-redis-socketio-host redis://localhost:6379
-    
-    # Ensure sites directory exists
-    mkdir -p sites
-    
-    # Configure common site settings
-    cat > sites/common_site_config.json << EOF
-{
-  "redis_cache": "redis://localhost:6379/0",
-  "redis_queue": "redis://localhost:6379/1",
-  "redis_socketio": "redis://localhost:6379/2",
-  "database_name": "$DB_NAME",
-  "root_login": "$DB_USER",
-  "root_password": "$DB_PASSWORD",
-  "host_name": "$DB_HOST",
-  "db_port": $DB_PORT,
-  "serve_default_site": true,
-  "default_site": "$SITE_NAME",
-  "auto_update": true,
-  "developer_mode": 0,
-  "maintenance_mode": 0,
-  "allow_tests": false,
-  "logging": 1
-}
-EOF
-    
-    # Get LMS app
-    echo "Getting LMS app..."
-    # bench get-app lms https://github.com/frappe/lms.git
-    echo "Skipping LMS app installation for now - will install after basic setup works"
-    
-else
-    echo "Bench already exists, using existing setup"
-    cd frappe-bench
-    
-    # Debug: Check current directory and list contents
-    echo "Current directory: $(pwd)"
-    echo "Directory contents:"
-    ls -la
-    
-    # Ensure sites directory exists - this is critical
-    echo "Creating sites directory..."
-    mkdir -p sites
-    
-    # Verify sites directory was created
-    if [ ! -d "sites" ]; then
-        echo "ERROR: Failed to create sites directory"
-        exit 1
-    fi
-    
-    echo "Sites directory confirmed to exist"
-    
-    # Ensure Redis configuration is up to date
-    echo "Updating Redis configuration..."
-    cat > sites/common_site_config.json << EOF
-{
-  "redis_cache": "redis://localhost:6379/0",
-  "redis_queue": "redis://localhost:6379/1",
-  "redis_socketio": "redis://localhost:6379/2",
-  "database_name": "$DB_NAME",
-  "root_login": "$DB_USER",
-  "root_password": "$DB_PASSWORD",
-  "host_name": "$DB_HOST",
-  "db_port": $DB_PORT,
-  "serve_default_site": true,
-  "default_site": "$SITE_NAME",
-  "auto_update": true,
-  "developer_mode": 0,
-  "maintenance_mode": 0,
-  "allow_tests": false,
-  "logging": 1
-}
-EOF
-fi
+# Create our own working directory that we have full control over
+WORK_DIR="frappe-lms-$(date +%s)"
+echo "Creating working directory: $WORK_DIR"
+mkdir -p "$WORK_DIR"
+cd "$WORK_DIR"
 
-# Ensure site exists
-if [ ! -d "sites/$SITE_NAME" ]; then
-    echo "Creating site directory and configuration manually..."
-    
-    # Create site directory structure
-    mkdir -p "sites/$SITE_NAME"
-    mkdir -p "sites/$SITE_NAME/private"
-    mkdir -p "sites/$SITE_NAME/public"
-    mkdir -p "sites/$SITE_NAME/locks"
-    
-    # Create a simple health check file
-    echo '{"status": "ok", "message": "Frappe LMS is running"}' > "sites/$SITE_NAME/public/health"
-    
-    # Create a basic index.html for immediate health checks
-    cat > "sites/$SITE_NAME/public/index.html" << 'EOF'
+# Create the basic directory structure manually
+echo "Creating basic Frappe directory structure..."
+mkdir -p sites
+mkdir -p apps
+mkdir -p logs
+mkdir -p config
+mkdir -p env
+
+# Create sites directory and basic configuration
+echo "Setting up sites configuration..."
+
+# Create common site configuration
+cat > sites/common_site_config.json << EOF
+{
+  "redis_cache": "redis://localhost:6379/0",
+  "redis_queue": "redis://localhost:6379/1",
+  "redis_socketio": "redis://localhost:6379/2",
+  "database_name": "$DB_NAME",
+  "root_login": "$DB_USER",
+  "root_password": "$DB_PASSWORD",
+  "host_name": "$DB_HOST",
+  "db_port": $DB_PORT,
+  "serve_default_site": true,
+  "default_site": "$SITE_NAME",
+  "auto_update": true,
+  "developer_mode": 0,
+  "maintenance_mode": 0,
+  "allow_tests": false,
+  "logging": 1
+}
+EOF
+
+echo "Common site configuration created successfully"
+
+# Create site directory and configuration
+echo "Creating site directory and configuration..."
+
+# Create site directory structure
+mkdir -p "sites/$SITE_NAME"
+mkdir -p "sites/$SITE_NAME/private"
+mkdir -p "sites/$SITE_NAME/public"
+mkdir -p "sites/$SITE_NAME/locks"
+
+# Create a simple health check file
+echo '{"status": "ok", "message": "Frappe LMS is running"}' > "sites/$SITE_NAME/public/health"
+
+# Create a basic index.html for immediate health checks
+cat > "sites/$SITE_NAME/public/index.html" << 'EOF'
 <!DOCTYPE html>
 <html>
 <head>
@@ -208,9 +126,9 @@ if [ ! -d "sites/$SITE_NAME" ]; then
 </body>
 </html>
 EOF
-    
-    # Create site_config.json with database connection
-    cat > "sites/$SITE_NAME/site_config.json" << EOF
+
+# Create site_config.json with database connection
+cat > "sites/$SITE_NAME/site_config.json" << EOF
 {
   "db_name": "$DB_NAME",
   "db_password": "$DB_PASSWORD",
@@ -228,80 +146,54 @@ EOF
   "redis_socketio": "redis://localhost:6379/2"
 }
 EOF
-    
-    # Register the site in sites.txt (add Railway domain if different)
-    echo "$SITE_NAME" > sites/sites.txt
-    if [ "$RAILWAY_PUBLIC_DOMAIN" != "" ] && [ "$RAILWAY_PUBLIC_DOMAIN" != "$SITE_NAME" ]; then
-        echo "$RAILWAY_PUBLIC_DOMAIN" >> sites/sites.txt
-    fi
-    
-    # Set current site
-    echo "$SITE_NAME" > sites/currentsite.txt
-    
-    # Create a basic database connection test
-    echo "Testing database connection..."
-    if test_mysql_connection; then
-        echo "Database connection successful"
-        
-        # Install mysql-connector-python if not available
-        pip install mysql-connector-python > /dev/null 2>&1 || echo "mysql-connector-python already installed"
-        
-        # Initialize Frappe database structure
-        echo "Running Frappe initialization..."
-        python3 /home/frappe/frappe-bench/init_frappe.py
-        
-        echo "Site configuration created successfully"
-        echo "Frappe will initialize remaining components on first request"
-    else
-        echo "Warning: Database connection failed, but continuing..."
-    fi
-    
-else
-    echo "Site $SITE_NAME already exists"
-    
-    # Ensure the site is properly registered
-    echo "$SITE_NAME" > sites/sites.txt
-    echo "$SITE_NAME" > sites/currentsite.txt
-    
-    # Update the site config to include host_name if missing
-    if [ -f "sites/$SITE_NAME/site_config.json" ]; then
-        # Check if host_name is missing and add it
-        if ! grep -q "host_name" "sites/$SITE_NAME/site_config.json"; then
-            # Add host_name to existing config
-            sed -i '$ s/}/,\n "host_name": "https:\/\/'$SITE_NAME'"\n}/' "sites/$SITE_NAME/site_config.json"
-        fi
-    fi
+
+# Register the site in sites.txt
+echo "$SITE_NAME" > sites/sites.txt
+if [ "$RAILWAY_PUBLIC_DOMAIN" != "" ] && [ "$RAILWAY_PUBLIC_DOMAIN" != "$SITE_NAME" ]; then
+    echo "$RAILWAY_PUBLIC_DOMAIN" >> sites/sites.txt
 fi
 
-# Set the site as default
-echo "Setting site as default..."
-# bench use "$SITE_NAME"
-echo "Skipping bench use command for now"
+# Set current site
+echo "$SITE_NAME" > sites/currentsite.txt
 
-# Build assets for production (this is safe and necessary)
-echo "Building assets for production..."
-# bench build --production
-echo "Skipping asset building for now"
+echo "Site configuration created successfully"
 
-# Run migrations if needed (skip for new sites, Frappe will auto-migrate)
-echo "Checking if migrations are needed..."
-if [ -f "sites/$SITE_NAME/locks/maintenance_mode.lock" ]; then
-    echo "Site in maintenance mode, running migrations..."
-    # Only run migrations if site is in maintenance mode
-    # bench --site "$SITE_NAME" --force migrate
-    echo "Skipping migrations for now"
+# Copy our custom files to the working directory
+echo "Setting up custom application files..."
+if [ -f "/home/frappe/frappe-bench/static_server.py" ]; then
+    cp /home/frappe/frappe-bench/static_server.py ./static_server.py
+fi
+if [ -f "/home/frappe/frappe-bench/init_frappe.py" ]; then
+    cp /home/frappe/frappe-bench/init_frappe.py ./init_frappe.py
+fi
+
+# Test database connection and initialize if needed
+echo "Testing database connection..."
+if test_mysql_connection; then
+    echo "Database connection successful"
+    
+    # Install mysql-connector-python if not available
+    pip install mysql-connector-python > /dev/null 2>&1 || echo "mysql-connector-python already installed"
+    
+    # Initialize Frappe database structure
+    echo "Running Frappe initialization..."
+    if [ -f "./init_frappe.py" ]; then
+        python3 ./init_frappe.py
+    fi
+    
+    echo "Database initialization completed"
 else
-    echo "Skipping migrations - Frappe will auto-migrate on startup"
+    echo "Warning: Database connection failed, but continuing..."
 fi
 
 echo "=== Starting Frappe LMS Production Server ==="
 
 # Set PYTHONPATH to include the current directory
-export PYTHONPATH="/home/frappe/frappe-bench:$PYTHONPATH"
+export PYTHONPATH="$(pwd):$PYTHONPATH"
 
 # Start Gunicorn with optimized settings for Railway
-exec /home/frappe/frappe-bench/env/bin/gunicorn \
-    --chdir=/home/frappe/frappe-bench \
+exec gunicorn \
+    --chdir="$(pwd)" \
     --bind=0.0.0.0:8080 \
     --workers=2 \
     --worker-class=sync \
