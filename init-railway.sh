@@ -34,36 +34,50 @@ if [ ! -d "frappe-bench" ]; then
 fi
 cd frappe-bench
 
-# 4. Configure bench for our environment
-echo "Configuring bench..."
-bench set-config -g db_host "$DB_HOST"
-bench set-config -g db_port "$DB_PORT"
-# This new setting is crucial for Railway health checks
-echo "Enabling default site to handle health checks..."
-bench set-config -g serve_default_site true
+# 4. Manually create the global config BEFORE running new-site.
+# This ensures new-site uses our settings for its first connection.
+echo "Creating/updating global config (common_site_config.json)..."
+python3 -c "
+import json
+import os
+config_path = 'sites/common_site_config.json'
+if os.path.exists(config_path):
+    with open(config_path, 'r') as f:
+        config = json.load(f)
+else:
+    config = {}
 
-# **FIX**: Add db_init_commands to the GLOBAL config to disable strict SQL mode.
-# This MUST be run BEFORE 'new-site' is called.
-echo "Disabling strict SQL mode globally for installation..."
-bench set-config -g db_init_commands "SET SESSION sql_mode = 'NO_ENGINE_SUBSTITUTION'"
+# Set global DB connection and health check settings
+config['db_host'] = os.environ.get('MYSQLHOST')
+config['db_port'] = int(os.environ.get('MYSQLPORT', 3306))
+config['serve_default_site'] = True
+# ** THE CRITICAL FIX **: Set SQL mode for the session.
+config['db_init_commands'] = \"SET SESSION sql_mode = 'NO_ENGINE_SUBSTITUTION'\"
+# Set Redis config
+config['redis_cache'] = 'redis://localhost:6379'
+config['redis_queue'] = 'redis://localhost:6379'
+config['redis_socketio'] = 'redis://localhost:6379'
 
-bench set-redis-cache-host "redis://localhost:6379"
-bench set-redis-queue-host "redis://localhost:6379"
-bench set-redis-socketio-host "redis://localhost:6379"
-echo "Bench configuration complete."
+with open(config_path, 'w') as f:
+    json.dump(config, f, indent=2)
+
+print('--- common_site_config.json contents ---')
+with open(config_path, 'r') as f:
+    print(f.read())
+print('----------------------------------------')
+print('Global config updated.')
+"
 
 # 5. Create and install site only if it's not already installed properly.
-# We check by trying to list apps. If it fails, the site needs installation.
 if ! bench --site "$SITE_NAME" list-apps >/dev/null 2>&1; then
     echo "Site '$SITE_NAME' is not installed correctly. Starting full installation..."
 
-    # Get LMS app if it's not already there
     if [ ! -d "apps/lms" ]; then
         echo "Getting LMS app..."
         bench get-app lms
     fi
     
-    # Use 'bench new-site' which is the correct way to create a site and admin user
+    # new-site will now read the global config we just created
     bench new-site "$SITE_NAME" \
         --db-type mariadb \
         --mariadb-root-username "$DB_USER" \
@@ -72,11 +86,9 @@ if ! bench --site "$SITE_NAME" list-apps >/dev/null 2>&1; then
         --force \
         --no-mariadb-socket
 
-    # Install the LMS app on the new site.
     echo "Installing LMS app on site..."
     bench --site "$SITE_NAME" install-app lms
     
-    # Finalize site setup
     bench --site "$SITE_NAME" set-config developer_mode 0
     bench use "$SITE_NAME"
     bench --site "$SITE_NAME" clear-cache
