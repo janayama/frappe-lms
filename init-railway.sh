@@ -139,28 +139,31 @@ print('---------------------------------')
 print('Manual site config created.')
 "
 
-# 8. Install apps directly, bypassing bench new-site
-echo "Site '$SITE_NAME' configured. Installing apps directly..."
+# 8. Manually import the initial database schema to bypass user creation logic.
+echo "Manually importing base MariaDB framework schema..."
+mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" < ./apps/frappe/frappe/database/mariadb/framework_mariadb.sql
+echo "Base schema imported."
+
+# 9. Install apps. This will also run schema migrations.
+echo "Site '$SITE_NAME' configured. Installing apps..."
 bench use "$SITE_NAME"
 
-echo "Reinstalling site to create core tables and install frappe app..."
-bench --site "$SITE_NAME" reinstall --yes < /dev/null
+echo "Installing Frappe framework..."
+bench --site "$SITE_NAME" install-app frappe
+
+echo "Installing LMS app..."
+bench get-app lms
+bench --site "$SITE_NAME" install-app lms
 
 echo "Setting admin password..."
 bench --site "$SITE_NAME" set-admin-password "$ADMIN_PASSWORD"
-
-echo "Getting LMS app..."
-bench get-app lms
-
-echo "Installing LMS app into the database..."
-bench --site "$SITE_NAME" install-app lms
 
 echo "Setting production mode and clearing cache..."
 bench --site "$SITE_NAME" set-config developer_mode 0
 bench --site "$SITE_NAME" clear-cache
 echo "Site '$SITE_NAME' created and installed successfully."
 
-# 9. Start production server
+# 10. Start production server
 echo "Starting Gunicorn production server on port $APP_PORT..."
 exec ./env/bin/gunicorn \
     --bind="0.0.0.0:$APP_PORT" \
