@@ -107,49 +107,17 @@ echo "Python version: $(python3 --version)"
 echo "Available disk space:"
 df -h .
 
-if [ ! -d "env" ]; then
-    echo "Creating virtual environment..."
-    python3 -m venv env
-    if [ $? -ne 0 ]; then
-        echo "Failed to create virtual environment"
-        exit 1
-    fi
-fi
+# Skip virtual environment for now and use system Python
+echo "Using system Python (skipping virtual environment for Railway compatibility)"
 
-# Verify virtual environment was created
-if [ ! -f "env/bin/activate" ]; then
-    echo "Virtual environment activation script not found"
-    echo "Current directory: $(pwd)"
-    echo "Directory contents:"
-    ls -la
-    echo "Attempting to create virtual environment again..."
-    rm -rf env
-    python3 -m venv env
-    if [ ! -f "env/bin/activate" ]; then
-        echo "Failed to create virtual environment, continuing without it..."
-        # Use system Python instead
-        pip3 install --user frappe lms
-        export PATH="$HOME/.local/bin:$PATH"
-        VENV_PREFIX=""
-    else
-        VENV_PREFIX="env/bin/"
-    fi
-else
-    VENV_PREFIX="env/bin/"
-fi
-
-# Activate virtual environment and install Frappe
+# Install Frappe and LMS dependencies using system Python
 echo "Installing Frappe and LMS dependencies..."
-if [ -f "env/bin/activate" ]; then
-    source env/bin/activate
-    pip install --upgrade pip
-    pip install -e apps/frappe
-    pip install -e apps/lms
-else
-    echo "Using system Python (no virtual environment)"
-    pip3 install --user -e apps/frappe
-    pip3 install --user -e apps/lms
-fi
+pip3 install --user --upgrade pip
+pip3 install --user -e apps/frappe
+pip3 install --user -e apps/lms
+
+# Ensure user bin directory is in PATH
+export PATH="$HOME/.local/bin:$PATH"
 
 # Create apps.txt to tell Frappe which apps are available
 echo "frappe" > sites/apps.txt
@@ -285,22 +253,15 @@ fi
 
 echo "=== Starting Frappe LMS Production Server ==="
 
-# Activate virtual environment if available
-if [ -f "env/bin/activate" ]; then
-    echo "Using virtual environment"
-    source env/bin/activate
-    GUNICORN_CMD="env/bin/gunicorn"
-else
-    echo "Using system Python"
-    export PATH="$HOME/.local/bin:$PATH"
-    GUNICORN_CMD="gunicorn"
-fi
+# Use system Python and ensure PATH includes user bin directory
+export PATH="$HOME/.local/bin:$PATH"
+echo "Using system Python with user packages"
 
 # Set PYTHONPATH to include the current directory and apps
 export PYTHONPATH="$(pwd):$(pwd)/apps:$PYTHONPATH"
 
 # Start Gunicorn with optimized settings for Railway
-exec $GUNICORN_CMD \
+exec gunicorn \
     --chdir="$(pwd)" \
     --bind=0.0.0.0:8080 \
     --workers=2 \
