@@ -37,17 +37,28 @@ class StaticFileMiddleware:
             return self.app(environ, start_response)
         except Exception as e:
             print(f"Error in Frappe application: {e}")
+            import traceback
+            print(f"Full traceback: {traceback.format_exc()}")
+            
             # Return a proper error response
             status = '500 Internal Server Error'
             headers = [('Content-Type', 'text/html')]
-            start_response(status, headers)
+            
+            # Only start response if it hasn't been started yet
+            try:
+                start_response(status, headers)
+            except:
+                # If start_response was already called, we can't change it
+                pass
+                
             error_html = f'''
             <html>
             <head><title>Application Error</title></head>
             <body>
                 <h1>Application Error</h1>
-                <p>Error processing request: {e}</p>
+                <p>Error processing request: {str(e)}</p>
                 <p>Path: /{path}</p>
+                <p>Check server logs for details.</p>
             </body>
             </html>
             '''
@@ -101,8 +112,15 @@ def create_app():
         import frappe
         
         # Set the current site
-        frappe.init(site=site_name)
-        frappe.connect()
+        try:
+            frappe.init(site=site_name)
+            frappe.connect()
+            print(f"Frappe initialized successfully for site: {site_name}")
+        except Exception as init_error:
+            print(f"Warning: Frappe initialization failed: {init_error}")
+            print("Continuing with basic Frappe setup...")
+            # Try basic initialization without site-specific setup
+            frappe.init()
         
         from frappe.app import application as frappe_app
         print("Successfully imported and initialized Frappe application!")
@@ -163,7 +181,7 @@ def create_app():
             <head><title>Frappe Initialization Error</title></head>
             <body>
                 <h1>Frappe Initialization Error</h1>
-                <p>Error during Frappe setup: {e}</p>
+                <p>Error during Frappe setup: {str(e)}</p>
                 <p>Check logs for full traceback.</p>
             </body>
             </html>
