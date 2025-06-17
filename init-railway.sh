@@ -125,6 +125,7 @@ config = {
     'db_user': os.environ.get('MARIADB_USER'),
     'db_password': os.environ.get('MARIADB_PASSWORD'),
     'root_password': os.environ.get('MARIADB_PASSWORD'),
+    'admin_password': os.environ.get('ADMIN_PASSWORD'),
     'db_host': os.environ.get('MARIADB_HOST'),
     'db_port': int(os.environ.get('MARIADB_PORT', 3306)),
     'db_type': 'mariadb'
@@ -154,9 +155,6 @@ bench --site "$SITE_NAME" install-app frappe
 echo "Installing LMS app..."
 bench get-app lms
 bench --site "$SITE_NAME" install-app lms
-
-echo "Setting admin password..."
-bench --site "$SITE_NAME" set-admin-password "$ADMIN_PASSWORD"
 
 echo "Setting production mode and clearing cache..."
 bench --site "$SITE_NAME" set-config developer_mode 0
