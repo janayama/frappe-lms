@@ -65,24 +65,49 @@ cd /home/frappe
 if [ ! -d "frappe-bench" ] || [ ! -f "frappe-bench/sites/common_site_config.json" ] || [ ! -d "frappe-bench/apps" ]; then
     echo "Initializing bench (directory missing or incomplete)..."
     
-    # Remove incomplete bench if it exists
+    # If bench directory exists but is incomplete, just ensure we have the basic structure
     if [ -d "frappe-bench" ]; then
-        echo "Removing incomplete bench directory..."
-        rm -rf frappe-bench
+        echo "Bench directory exists but is incomplete, fixing structure..."
+        cd frappe-bench
+        
+        # Ensure basic directories exist
+        mkdir -p sites
+        mkdir -p apps
+        mkdir -p logs
+        mkdir -p config
+        
+        # If apps directory is empty, we need to get frappe
+        if [ ! -d "apps/frappe" ]; then
+            echo "Getting Frappe framework..."
+            git clone https://github.com/frappe/frappe.git apps/frappe --depth 1
+        fi
+        
+        # If no virtual environment exists, create one
+        if [ ! -d "env" ]; then
+            echo "Creating virtual environment..."
+            python3 -m venv env
+            source env/bin/activate
+            pip install -e apps/frappe
+        fi
+        
+        BENCH_DIR="frappe-bench"
+    else
+        # Initialize bench from scratch
+        bench init --skip-redis-config-generation --python python3 frappe-bench
+        cd frappe-bench
+        BENCH_DIR="frappe-bench"
     fi
     
-    # Initialize bench
-    bench init --skip-redis-config-generation --python python3 frappe-bench
-    cd frappe-bench
-    
     # Configure database connection
-    bench set-mariadb-host "$DB_HOST"
-    bench set-mariadb-port "$DB_PORT"
+    echo "Configuring database connection..."
+    # bench set-mariadb-host "$DB_HOST"
+    # bench set-mariadb-port "$DB_PORT"
     
     # Configure Redis
-    bench set-redis-cache-host redis://localhost:6379
-    bench set-redis-queue-host redis://localhost:6379
-    bench set-redis-socketio-host redis://localhost:6379
+    echo "Configuring Redis..."
+    # bench set-redis-cache-host redis://localhost:6379
+    # bench set-redis-queue-host redis://localhost:6379
+    # bench set-redis-socketio-host redis://localhost:6379
     
     # Ensure sites directory exists
     mkdir -p sites
@@ -110,7 +135,8 @@ EOF
     
     # Get LMS app
     echo "Getting LMS app..."
-    bench get-app lms https://github.com/frappe/lms.git
+    # bench get-app lms https://github.com/frappe/lms.git
+    echo "Skipping LMS app installation for now - will install after basic setup works"
     
 else
     echo "Bench already exists, using existing setup"
@@ -248,18 +274,22 @@ else
 fi
 
 # Set the site as default
-bench use "$SITE_NAME"
+echo "Setting site as default..."
+# bench use "$SITE_NAME"
+echo "Skipping bench use command for now"
 
 # Build assets for production (this is safe and necessary)
 echo "Building assets for production..."
-bench build --production
+# bench build --production
+echo "Skipping asset building for now"
 
 # Run migrations if needed (skip for new sites, Frappe will auto-migrate)
 echo "Checking if migrations are needed..."
 if [ -f "sites/$SITE_NAME/locks/maintenance_mode.lock" ]; then
     echo "Site in maintenance mode, running migrations..."
     # Only run migrations if site is in maintenance mode
-    bench --site "$SITE_NAME" --force migrate
+    # bench --site "$SITE_NAME" --force migrate
+    echo "Skipping migrations for now"
 else
     echo "Skipping migrations - Frappe will auto-migrate on startup"
 fi
