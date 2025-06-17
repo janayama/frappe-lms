@@ -55,7 +55,7 @@ if [ ! -d "sites/$SITE_NAME" ]; then
     
     # Use 'bench new-site' which is the correct way to create a site and admin user
     bench new-site "$SITE_NAME" \
-        --db-type mysql \
+        --db-type mariadb \
         --db-host "$DB_HOST" \
         --db-port "$DB_PORT" \
         --db-name "$DB_NAME" \
