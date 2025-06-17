@@ -86,6 +86,38 @@ mkdir -p logs
 mkdir -p config
 mkdir -p env
 
+# Install Frappe framework
+echo "Installing Frappe framework..."
+if [ ! -d "apps/frappe" ]; then
+    echo "Cloning Frappe framework..."
+    git clone https://github.com/frappe/frappe.git apps/frappe --depth 1 --branch version-15
+fi
+
+# Install LMS app
+echo "Installing LMS app..."
+if [ ! -d "apps/lms" ]; then
+    echo "Cloning LMS app..."
+    git clone https://github.com/frappe/lms.git apps/lms --depth 1
+fi
+
+# Create virtual environment and install dependencies
+echo "Setting up Python environment..."
+if [ ! -d "env" ]; then
+    echo "Creating virtual environment..."
+    python3 -m venv env
+fi
+
+# Activate virtual environment and install Frappe
+echo "Installing Frappe and LMS dependencies..."
+source env/bin/activate
+pip install --upgrade pip
+pip install -e apps/frappe
+pip install -e apps/lms
+
+# Create apps.txt to tell Frappe which apps are available
+echo "frappe" > sites/apps.txt
+echo "lms" >> sites/apps.txt
+
 # Create sites directory and basic configuration
 echo "Setting up sites configuration..."
 
@@ -154,7 +186,8 @@ cat > "sites/$SITE_NAME/site_config.json" << EOF
   "encryption_key": "$(openssl rand -base64 32)",
   "redis_cache": "redis://localhost:6379/0",
   "redis_queue": "redis://localhost:6379/1",
-  "redis_socketio": "redis://localhost:6379/2"
+  "redis_socketio": "redis://localhost:6379/2",
+  "installed_apps": ["frappe", "lms"]
 }
 EOF
 
@@ -215,11 +248,14 @@ fi
 
 echo "=== Starting Frappe LMS Production Server ==="
 
-# Set PYTHONPATH to include the current directory
-export PYTHONPATH="$(pwd):$PYTHONPATH"
+# Activate virtual environment
+source env/bin/activate
+
+# Set PYTHONPATH to include the current directory and apps
+export PYTHONPATH="$(pwd):$(pwd)/apps:$PYTHONPATH"
 
 # Start Gunicorn with optimized settings for Railway
-exec gunicorn \
+exec env/bin/gunicorn \
     --chdir="$(pwd)" \
     --bind=0.0.0.0:8080 \
     --workers=2 \

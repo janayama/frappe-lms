@@ -13,6 +13,9 @@ RUN apt-get update && apt-get install -y \
     default-mysql-client \
     redis-server \
     procps \
+    git \
+    build-essential \
+    python3-dev \
     && pip3 install --no-cache-dir gunicorn \
     && rm -rf /var/lib/apt/lists/*
 
