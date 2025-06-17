@@ -143,7 +143,7 @@ echo "Site '$SITE_NAME' configured. Installing apps directly..."
 bench use "$SITE_NAME"
 
 echo "Reinstalling site to create core tables and install frappe app..."
-bench --site "$SITE_NAME" reinstall --yes
+bench --site "$SITE_NAME" reinstall --yes < /dev/null
 
 echo "Setting admin password..."
 bench --site "$SITE_NAME" set-admin-password "$ADMIN_PASSWORD"
