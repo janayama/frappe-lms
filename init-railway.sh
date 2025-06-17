@@ -124,6 +124,7 @@ config = {
     'db_name': os.environ.get('MYSQLDATABASE'),
     'db_user': os.environ.get('MYSQLUSER'),
     'db_password': os.environ.get('MYSQLPASSWORD'),
+    'root_password': os.environ.get('MYSQLPASSWORD'),
     'db_host': os.environ.get('MYSQLHOST'),
     'db_port': int(os.environ.get('MYSQLPORT', 3306)),
     'db_type': 'mariadb'
