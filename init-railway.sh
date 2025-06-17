@@ -6,11 +6,11 @@ echo "=== Frappe LMS Railway Production Setup - DEFINITIVE FIX ==="
 
 # Set environment variables
 export SITE_NAME="${SITE_NAME:-lms.railway.app}"
-export DB_HOST="${MYSQLHOST:-localhost}"
-export DB_PORT="${MYSQLPORT:-3306}"
-export DB_NAME="${MYSQLDATABASE:-railway}"
-export DB_USER="${MYSQLUSER}"
-export DB_PASSWORD="${MYSQLPASSWORD}"
+export DB_HOST="${MARIADB_HOST:-localhost}"
+export DB_PORT="${MARIADB_PORT:-3306}"
+export DB_NAME="${MARIADB_DATABASE:-railway}"
+export DB_USER="${MARIADB_USER}"
+export DB_PASSWORD="${MARIADB_PASSWORD}"
 export ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin}"
 export APP_PORT="${PORT:-8000}"
 
@@ -45,8 +45,8 @@ python3 -c "
 import json, os
 config_path = 'sites/common_site_config.json'
 config = {
-    'db_host': os.environ.get('MYSQLHOST'),
-    'db_port': int(os.environ.get('MYSQLPORT', 3306)),
+    'db_host': os.environ.get('MARIADB_HOST'),
+    'db_port': int(os.environ.get('MARIADB_PORT', 3306)),
     'redis_cache': 'redis://localhost:6379',
     'redis_queue': 'redis://localhost:6379',
     'redis_socketio': 'redis://localhost:6379',
@@ -63,7 +63,7 @@ print('Global config created.')
 "
 
 # 6. Manually patch Frappe source code for BLOB/TEXT errors
-echo "Patching Frappe source for compatibility with modern MySQL..."
+echo "Patching Frappe source for compatibility with modern databases (strict sql_mode)..."
 python3 -c "
 import json, os, sys
 
@@ -121,12 +121,12 @@ python3 -c "
 import json, os
 config_path = 'sites/$SITE_NAME/site_config.json'
 config = {
-    'db_name': os.environ.get('MYSQLDATABASE'),
-    'db_user': os.environ.get('MYSQLUSER'),
-    'db_password': os.environ.get('MYSQLPASSWORD'),
-    'root_password': os.environ.get('MYSQLPASSWORD'),
-    'db_host': os.environ.get('MYSQLHOST'),
-    'db_port': int(os.environ.get('MYSQLPORT', 3306)),
+    'db_name': os.environ.get('MARIADB_DATABASE'),
+    'db_user': os.environ.get('MARIADB_USER'),
+    'db_password': os.environ.get('MARIADB_PASSWORD'),
+    'root_password': os.environ.get('MARIADB_PASSWORD'),
+    'db_host': os.environ.get('MARIADB_HOST'),
+    'db_port': int(os.environ.get('MARIADB_PORT', 3306)),
     'db_type': 'mariadb'
 }
 with open(config_path, 'w') as f:
