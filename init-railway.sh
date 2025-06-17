@@ -60,7 +60,10 @@ if os.path.exists(config_file):
     fi
     
     # Start the application
-    bench serve --port $APP_PORT --host 0.0.0.0
+    echo "Starting Frappe web server..."
+    # Use bench serve for single process (Railway compatible)
+    # bench start runs multiple processes which doesn't work well on Railway
+    bench serve --port $APP_PORT
 else
     echo "Creating new bench..."
     
@@ -113,6 +116,8 @@ else
     echo "Setup completed successfully!"
     
     # Start the application
-    echo "Starting Frappe LMS on port $APP_PORT..."
-    bench serve --port $APP_PORT --host 0.0.0.0
+    echo "Starting Frappe web server..."
+    # Use bench serve for single process (Railway compatible)
+    # bench start runs multiple processes which doesn't work well on Railway
+    bench serve --port $APP_PORT
 fi 
