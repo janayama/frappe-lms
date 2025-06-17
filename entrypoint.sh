@@ -62,8 +62,14 @@ wait_for_service "Redis" \
 cd /home/frappe
 
 # Check if bench is already initialized
-if [ ! -d "frappe-bench" ]; then
-    echo "Initializing bench..."
+if [ ! -d "frappe-bench" ] || [ ! -f "frappe-bench/sites/common_site_config.json" ] || [ ! -d "frappe-bench/apps" ]; then
+    echo "Initializing bench (directory missing or incomplete)..."
+    
+    # Remove incomplete bench if it exists
+    if [ -d "frappe-bench" ]; then
+        echo "Removing incomplete bench directory..."
+        rm -rf frappe-bench
+    fi
     
     # Initialize bench
     bench init --skip-redis-config-generation --python python3 frappe-bench
@@ -110,8 +116,22 @@ else
     echo "Bench already exists, using existing setup"
     cd frappe-bench
     
-    # Ensure sites directory exists
+    # Debug: Check current directory and list contents
+    echo "Current directory: $(pwd)"
+    echo "Directory contents:"
+    ls -la
+    
+    # Ensure sites directory exists - this is critical
+    echo "Creating sites directory..."
     mkdir -p sites
+    
+    # Verify sites directory was created
+    if [ ! -d "sites" ]; then
+        echo "ERROR: Failed to create sites directory"
+        exit 1
+    fi
+    
+    echo "Sites directory confirmed to exist"
     
     # Ensure Redis configuration is up to date
     echo "Updating Redis configuration..."
