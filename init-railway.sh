@@ -50,7 +50,8 @@ config = {
     'redis_cache': 'redis://localhost:6379',
     'redis_queue': 'redis://localhost:6379',
     'redis_socketio': 'redis://localhost:6379',
-    'serve_default_site': True
+    'serve_default_site': True,
+    'socketio_port': 9000
 }
 with open(config_path, 'w') as f:
     json.dump(config, f, indent=2)
@@ -161,7 +162,10 @@ bench --site "$SITE_NAME" set-config developer_mode 0
 bench --site "$SITE_NAME" clear-cache
 echo "Site '$SITE_NAME' created and installed successfully."
 
-# 10. Start production server
+# 10. Start production servers
+echo "Starting Socket.IO server in the background..."
+bench start-socketio &
+
 echo "Starting Gunicorn production server on port $APP_PORT..."
 exec ./env/bin/gunicorn \
     --bind="0.0.0.0:$APP_PORT" \
