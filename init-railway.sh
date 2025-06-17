@@ -153,8 +153,11 @@ bench use "$SITE_NAME"
 echo "Installing Frappe framework..."
 bench --site "$SITE_NAME" install-app frappe
 
+echo "Getting LMS app from local repository source..."
+# Since Railway has already cloned the repo, we can install the app from the local path.
+bench get-app ../
+
 echo "Installing LMS app..."
-bench get-app lms
 bench --site "$SITE_NAME" install-app lms
 
 echo "Setting production mode and clearing cache..."

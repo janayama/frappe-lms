@@ -1,7 +1,9 @@
 import { io } from 'socket.io-client'
-import { socketio_port } from '../../../../sites/common_site_config.json'
+const socketio_port = 9000;
 import { getCachedListResource } from 'frappe-ui/src/resources/listResource'
 import { getCachedResource } from 'frappe-ui/src/resources/resources'
+
+let socket = null
 
 export function initSocket() {
 	let host = window.location.hostname
@@ -10,7 +12,7 @@ export function initSocket() {
 	let protocol = port ? 'http' : 'https'
 	let url = `${protocol}://${host}${port}/${siteName}`
 
-	let socket = io(url, {
+	socket = io(url, {
 		withCredentials: true,
 		reconnectionAttempts: 5,
 	})
