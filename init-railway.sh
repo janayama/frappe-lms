@@ -113,6 +113,8 @@ print('Patching process complete.')
 # 7. Create and install site, providing ALL arguments to prevent any defaults.
 if ! bench --site "$SITE_NAME" list-apps >/dev/null 2>&1; then
     echo "Site '$SITE_NAME' not installed. Starting installation..."
+
+    # Create the site using all necessary flags to prevent interactive prompts AND access denied errors.
     bench new-site "$SITE_NAME" \
         --db-type mariadb \
         --db-name "$DB_NAME" \
@@ -121,7 +123,8 @@ if ! bench --site "$SITE_NAME" list-apps >/dev/null 2>&1; then
         --mariadb-root-username "$DB_USER" \
         --mariadb-root-password "$DB_PASSWORD" \
         --admin-password "$ADMIN_PASSWORD" \
-        --force
+        --force \
+        --mariadb-user-host-login-scope '%'
     
     bench get-app lms
     bench --site "$SITE_NAME" install-app lms
