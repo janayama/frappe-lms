@@ -142,6 +142,9 @@ print('Manual site config created.')
 echo "Site '$SITE_NAME' configured. Installing apps directly..."
 bench use "$SITE_NAME"
 
+echo "Running initial database migrations to create core tables..."
+bench --site "$SITE_NAME" migrate
+
 echo "Installing Frappe framework into the database..."
 bench --site "$SITE_NAME" install-app frappe
 
