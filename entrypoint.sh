@@ -89,15 +89,15 @@ mkdir -p env
 # Install Frappe framework
 echo "Installing Frappe framework..."
 if [ ! -d "apps/frappe" ]; then
-    echo "Cloning Frappe framework..."
-    git clone https://github.com/frappe/frappe.git apps/frappe --depth 1 --branch version-15
+    echo "Cloning Frappe framework (shallow clone for speed)..."
+    git clone https://github.com/frappe/frappe.git apps/frappe --depth 1 --branch version-15 --single-branch
 fi
 
 # Install LMS app
 echo "Installing LMS app..."
 if [ ! -d "apps/lms" ]; then
-    echo "Cloning LMS app..."
-    git clone https://github.com/frappe/lms.git apps/lms --depth 1
+    echo "Cloning LMS app (shallow clone for speed)..."
+    git clone https://github.com/frappe/lms.git apps/lms --depth 1 --single-branch
 fi
 
 # Create virtual environment and install dependencies
@@ -121,27 +121,27 @@ pip3 uninstall -y cairocffi lxml markdown fuzzywuzzy websocket_client razorpay 2
 # Create a temporary requirements file with exact versions to avoid conflicts
 echo "Creating requirements file with compatible versions..."
 cat > /tmp/requirements.txt << 'EOF'
-# Core Frappe dependencies with exact versions
-cairocffi==1.5.1
+# Core dependencies with LMS-compatible versions (LMS takes priority)
+cairocffi==1.6.1
 lxml==4.9.4
 markdown==3.5.2
 fuzzywuzzy==0.18.0
 websocket_client==1.6.4
 razorpay==1.4.2
 
-# Install frappe first
+# Install frappe first but allow dependency override
 -e apps/frappe
 
 # Then install LMS with --no-deps to avoid conflicts
 EOF
 
 # Install using the requirements file
-echo "Installing packages with controlled dependencies..."
+echo "Installing packages with LMS-compatible dependencies..."
 pip3 install --user -r /tmp/requirements.txt
 
-# Install LMS separately with --no-deps to prevent it from overriding dependencies
-echo "Installing LMS application without dependency resolution..."
-pip3 install --user --no-deps -e apps/lms
+# Install LMS normally (it should be compatible now)
+echo "Installing LMS application..."
+pip3 install --user -e apps/lms
 
 # Verify the installation
 echo "Verifying installation..."
@@ -207,37 +207,33 @@ cat > "sites/$SITE_NAME/public/index.html" << 'EOF'
 </html>
 EOF
 
-# Create site_config.json with database connection
-cat > "sites/$SITE_NAME/site_config.json" << EOF
+# Create the Frappe site properly
+echo "Creating Frappe site..."
+cd /home/frappe/frappe-lms-*/
+export PATH="$HOME/.local/bin:$PATH"
+
+# Simple approach: just ensure the site is registered in sites.txt and has proper config
+echo "Ensuring site is properly registered..."
+echo "$SITE_NAME" > sites/sites.txt
+echo "$SITE_NAME" > sites/currentsite.txt
+
+# Verify site config exists
+if [ ! -f "sites/$SITE_NAME/site_config.json" ]; then
+    echo "Creating site configuration..."
+    cat > "sites/$SITE_NAME/site_config.json" << EOF
 {
   "db_name": "$DB_NAME",
   "db_password": "$DB_PASSWORD",
   "db_type": "mysql",
   "db_host": "$DB_HOST",
   "db_port": $DB_PORT,
-  "auto_update": true,
-  "serve_default_site": true,
-  "host_name": "$SITE_NAME",
-  "developer_mode": 0,
-  "admin_password": "$ADMIN_PASSWORD",
-  "encryption_key": "$(openssl rand -base64 32)",
-  "redis_cache": "redis://localhost:6379/0",
-  "redis_queue": "redis://localhost:6379/1",
-  "redis_socketio": "redis://localhost:6379/2",
-  "installed_apps": ["frappe", "lms"]
+  "installed_apps": ["frappe", "lms"],
+  "encryption_key": "$(openssl rand -base64 32)"
 }
 EOF
-
-# Register the site in sites.txt
-echo "$SITE_NAME" > sites/sites.txt
-if [ "$RAILWAY_PUBLIC_DOMAIN" != "" ] && [ "$RAILWAY_PUBLIC_DOMAIN" != "$SITE_NAME" ]; then
-    echo "$RAILWAY_PUBLIC_DOMAIN" >> sites/sites.txt
 fi
 
-# Set current site
-echo "$SITE_NAME" > sites/currentsite.txt
-
-echo "Site configuration created successfully"
+echo "Site setup completed"
 
 # Copy our custom files to the working directory
 echo "Setting up custom application files..."
@@ -347,19 +343,10 @@ echo "Using system Python with user packages"
 # Set PYTHONPATH to include the current directory and apps
 export PYTHONPATH="$(pwd):$(pwd)/apps:$PYTHONPATH"
 
-# Start Gunicorn with optimized settings for Railway
-exec gunicorn \
-    --chdir="$(pwd)" \
-    --bind=0.0.0.0:8080 \
-    --workers=2 \
-    --worker-class=sync \
-    --worker-connections=1000 \
-    --max-requests=1000 \
-    --max-requests-jitter=50 \
-    --preload \
-    --timeout=120 \
-    --keep-alive=2 \
-    --log-level=info \
-    --access-logfile=- \
-    --error-logfile=- \
-    static_server:application 
+# Start the application
+echo "Starting Frappe LMS application..."
+cd /home/frappe/frappe-lms-*/
+
+# Start the Python WSGI server directly (simpler and faster)
+echo "Starting Python server on port $PORT..."
+exec python3 static_server.py 

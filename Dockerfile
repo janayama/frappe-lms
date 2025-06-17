@@ -1,53 +1,35 @@
 FROM frappe/bench:latest
 
-# Set environment variables
-ENV PYTHONUNBUFFERED=1
-ENV DEBIAN_FRONTEND=noninteractive
-ENV SHELL=/bin/bash
-
-# Install system dependencies for Railway deployment
+# Switch to root for installation
 USER root
+
+# Install system dependencies and Python packages in one layer
 RUN apt-get update && apt-get install -y \
-    wget \
-    curl \
-    default-mysql-client \
-    redis-server \
-    procps \
     git \
-    build-essential \
-    python3-dev \
-    && pip3 install --no-cache-dir gunicorn \
-    && rm -rf /var/lib/apt/lists/*
+    curl \
+    redis-server \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip3 install --no-cache-dir gunicorn
 
 # Switch back to frappe user
 USER frappe
+
+# Set working directory
 WORKDIR /home/frappe
 
-# Copy custom files
-USER root
-COPY entrypoint.sh /home/frappe/frappe-bench/
-COPY healthcheck.sh /home/frappe/frappe-bench/
-COPY init_frappe.py /home/frappe/frappe-bench/
-COPY static_server.py /home/frappe/frappe-bench/
+# Copy application files
+COPY --chown=frappe:frappe entrypoint.sh ./
+COPY --chown=frappe:frappe static_server.py ./
 
-# Make the scripts executable and fix ownership
-RUN chmod +x /home/frappe/frappe-bench/entrypoint.sh \
-    /home/frappe/frappe-bench/healthcheck.sh \
-    /home/frappe/frappe-bench/init_frappe.py && \
-    chown frappe:frappe /home/frappe/frappe-bench/entrypoint.sh \
-    /home/frappe/frappe-bench/healthcheck.sh \
-    /home/frappe/frappe-bench/init_frappe.py \
-    /home/frappe/frappe-bench/static_server.py
+# Make entrypoint executable
+RUN chmod +x entrypoint.sh
 
-# Switch back to frappe user for runtime
-USER frappe
-
-# Set the working directory
-WORKDIR /home/frappe/frappe-bench
+# Expose port
+EXPOSE 8080
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=300s --retries=3 \
-    CMD ./healthcheck.sh
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
 
-# Set entrypoint
-ENTRYPOINT ["./entrypoint.sh"] 
+# Start the application
+CMD ["./entrypoint.sh"] 
