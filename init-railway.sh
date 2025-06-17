@@ -39,12 +39,6 @@ bench init --skip-redis-config-generation frappe-bench
 echo "Bench initialization complete."
 cd frappe-bench
 
-# DIAGNOSTIC STEP: Find the correct path for the problematic doctype files.
-echo "--- DIAGNOSTIC: Trying to locate doctype JSON definition files ---"
-find . -name "notification.json" -print || echo "--> notification.json not found."
-find . -name "workspace.json" -print || echo "--> workspace.json not found."
-echo "-----------------------------------------------------------------"
-
 # 5. Manually create the global config BEFORE running new-site.
 echo "Creating global config (common_site_config.json) for the main application..."
 python3 -c "
@@ -106,7 +100,7 @@ def patch_doctype(path, field_to_patch):
 # Format is: ('/path/to/file.json', 'field_name_to_fix')
 patches = [
     ('./apps/frappe/frappe/desk/doctype/workspace/workspace.json', 'content'),
-    ('./apps/frappe/frappe/core/doctype/notification/notification.json', 'message')
+    ('./apps/frappe/frappe/email/doctype/notification/notification.json', 'message')
 ]
 
 print(f'Applying {len(patches)} patches...')
