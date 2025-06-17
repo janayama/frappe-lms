@@ -110,34 +110,52 @@ for path, field_name in patches:
 print('Patching process complete.')
 "
 
-# 7. Create and install site, providing ALL arguments to prevent any defaults.
-if ! bench --site "$SITE_NAME" list-apps >/dev/null 2>&1; then
-    echo "Site '$SITE_NAME' not installed. Starting installation..."
+# 7. Manually create site configuration to bypass problematic user creation in new-site
+echo "Manually creating site config for '$SITE_NAME' to bypass new-site helper..."
+mkdir -p "sites/$SITE_NAME"
+python3 -c "
+import json, os
+config_path = 'sites/$SITE_NAME/site_config.json'
+config = {
+    'db_name': os.environ.get('MYSQLDATABASE'),
+    'db_user': os.environ.get('MYSQLUSER'),
+    'db_password': os.environ.get('MYSQLPASSWORD'),
+    'db_host': os.environ.get('MYSQLHOST'),
+    'db_port': int(os.environ.get('MYSQLPORT', 3306)),
+    'db_type': 'mariadb'
+}
+with open(config_path, 'w') as f:
+    json.dump(config, f, indent=2)
 
-    # Create the site using all necessary flags to prevent interactive prompts AND access denied errors.
-    bench new-site "$SITE_NAME" \
-        --db-type mariadb \
-        --db-name "$DB_NAME" \
-        --db-host "$DB_HOST" \
-        --db-port "$DB_PORT" \
-        --mariadb-root-username "$DB_USER" \
-        --mariadb-root-password "$DB_PASSWORD" \
-        --admin-password "$ADMIN_PASSWORD" \
-        --force \
-        --mariadb-user-host-login-scope '%'
-    
-    bench get-app lms
-    bench --site "$SITE_NAME" install-app lms
-    
-    bench --site "$SITE_NAME" set-config developer_mode 0
-    bench use "$SITE_NAME"
-    bench --site "$SITE_NAME" clear-cache
-    echo "Site '$SITE_NAME' created and installed successfully."
-else
-    echo "Site '$SITE_NAME' already installed. Skipping creation."
-fi
+print('--- site_config.json contents ---')
+with open(config_path, 'r') as f:
+    print(f.read())
+print('---------------------------------')
+print('Manual site config created.')
+"
 
-# 8. Start production server
+# 8. Install apps directly, bypassing bench new-site
+echo "Site '$SITE_NAME' configured. Installing apps directly..."
+bench use "$SITE_NAME"
+
+echo "Installing Frappe framework into the database..."
+bench --site "$SITE_NAME" install-app frappe --verbose
+
+echo "Setting admin password..."
+bench --site "$SITE_NAME" set-admin-password "$ADMIN_PASSWORD"
+
+echo "Getting LMS app..."
+bench get-app lms
+
+echo "Installing LMS app into the database..."
+bench --site "$SITE_NAME" install-app lms --verbose
+
+echo "Setting production mode and clearing cache..."
+bench --site "$SITE_NAME" set-config developer_mode 0
+bench --site "$SITE_NAME" clear-cache
+echo "Site '$SITE_NAME' created and installed successfully."
+
+# 9. Start production server
 echo "Starting Gunicorn production server on port $APP_PORT..."
 exec ./env/bin/gunicorn \
     --bind="0.0.0.0:$APP_PORT" \
