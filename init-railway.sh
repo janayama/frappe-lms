@@ -164,7 +164,7 @@ echo "Site '$SITE_NAME' created and installed successfully."
 
 # 10. Start production servers
 echo "Starting Socket.IO server in the background..."
-bench start-socketio &
+node socketio.js &
 
 echo "Starting Gunicorn production server on port $APP_PORT..."
 exec ./env/bin/gunicorn \
