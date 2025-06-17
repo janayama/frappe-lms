@@ -15,7 +15,18 @@ echo "=== Frappe LMS Railway Production Setup ==="
 echo "Site: $SITE_NAME"
 echo "Database Host: $DB_HOST:$DB_PORT"
 echo "Database Name: $DB_NAME"
+echo "Database User: $DB_USER"
 echo "Port: $PORT"
+echo ""
+echo "=== Environment Variable Debug ==="
+echo "MYSQLHOST: $MYSQLHOST"
+echo "MYSQLPORT: $MYSQLPORT"
+echo "MYSQLDATABASE: $MYSQLDATABASE"
+echo "MYSQLUSER: $MYSQLUSER"
+echo "MYSQLPASSWORD: [${#MYSQLPASSWORD} characters]"
+echo "SITE_NAME: $SITE_NAME"
+echo "ADMIN_PASSWORD: [${#ADMIN_PASSWORD} characters]"
+echo ""
 
 # Function to test MySQL connection
 test_mysql_connection() {
@@ -175,8 +186,24 @@ if test_mysql_connection; then
     # Install mysql-connector-python if not available
     pip install mysql-connector-python > /dev/null 2>&1 || echo "mysql-connector-python already installed"
     
+    # Export environment variables for the Python script
+    export DB_HOST="$DB_HOST"
+    export DB_PORT="$DB_PORT"
+    export DB_NAME="$DB_NAME"
+    export DB_USER="$DB_USER"
+    export DB_PASSWORD="$DB_PASSWORD"
+    export SITE_NAME="$SITE_NAME"
+    export ADMIN_PASSWORD="$ADMIN_PASSWORD"
+    
     # Initialize Frappe database structure
     echo "Running Frappe initialization..."
+    echo "Using database: $DB_HOST:$DB_PORT/$DB_NAME"
+    echo "Exported variables for Python script:"
+    echo "  DB_HOST=$DB_HOST"
+    echo "  DB_PORT=$DB_PORT"
+    echo "  DB_NAME=$DB_NAME"
+    echo "  DB_USER=$DB_USER"
+    echo "  DB_PASSWORD=[${#DB_PASSWORD} characters]"
     if [ -f "./init_frappe.py" ]; then
         python3 ./init_frappe.py
     fi

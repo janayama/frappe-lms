@@ -18,6 +18,16 @@ def init_frappe_site():
     db_name = os.environ.get('DB_NAME', 'frappe_lms')
     admin_password = os.environ.get('ADMIN_PASSWORD', 'admin')
     
+    print(f"=== Python Script Environment Variables ===")
+    print(f"SITE_NAME: {site_name}")
+    print(f"DB_HOST: {db_host}")
+    print(f"DB_PORT: {db_port}")
+    print(f"DB_USER: {db_user}")
+    print(f"DB_PASSWORD: [{'*' * len(db_password) if db_password else 'EMPTY'}]")
+    print(f"DB_NAME: {db_name}")
+    print(f"ADMIN_PASSWORD: [{'*' * len(admin_password) if admin_password else 'EMPTY'}]")
+    print(f"===========================================")
+    
     print(f"Initializing Frappe site: {site_name}")
     print(f"Database: {db_host}:{db_port}/{db_name}")
     
