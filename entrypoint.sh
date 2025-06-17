@@ -102,17 +102,54 @@ fi
 
 # Create virtual environment and install dependencies
 echo "Setting up Python environment..."
+echo "Current directory: $(pwd)"
+echo "Python version: $(python3 --version)"
+echo "Available disk space:"
+df -h .
+
 if [ ! -d "env" ]; then
     echo "Creating virtual environment..."
     python3 -m venv env
+    if [ $? -ne 0 ]; then
+        echo "Failed to create virtual environment"
+        exit 1
+    fi
+fi
+
+# Verify virtual environment was created
+if [ ! -f "env/bin/activate" ]; then
+    echo "Virtual environment activation script not found"
+    echo "Current directory: $(pwd)"
+    echo "Directory contents:"
+    ls -la
+    echo "Attempting to create virtual environment again..."
+    rm -rf env
+    python3 -m venv env
+    if [ ! -f "env/bin/activate" ]; then
+        echo "Failed to create virtual environment, continuing without it..."
+        # Use system Python instead
+        pip3 install --user frappe lms
+        export PATH="$HOME/.local/bin:$PATH"
+        VENV_PREFIX=""
+    else
+        VENV_PREFIX="env/bin/"
+    fi
+else
+    VENV_PREFIX="env/bin/"
 fi
 
 # Activate virtual environment and install Frappe
 echo "Installing Frappe and LMS dependencies..."
-source env/bin/activate
-pip install --upgrade pip
-pip install -e apps/frappe
-pip install -e apps/lms
+if [ -f "env/bin/activate" ]; then
+    source env/bin/activate
+    pip install --upgrade pip
+    pip install -e apps/frappe
+    pip install -e apps/lms
+else
+    echo "Using system Python (no virtual environment)"
+    pip3 install --user -e apps/frappe
+    pip3 install --user -e apps/lms
+fi
 
 # Create apps.txt to tell Frappe which apps are available
 echo "frappe" > sites/apps.txt
@@ -248,14 +285,22 @@ fi
 
 echo "=== Starting Frappe LMS Production Server ==="
 
-# Activate virtual environment
-source env/bin/activate
+# Activate virtual environment if available
+if [ -f "env/bin/activate" ]; then
+    echo "Using virtual environment"
+    source env/bin/activate
+    GUNICORN_CMD="env/bin/gunicorn"
+else
+    echo "Using system Python"
+    export PATH="$HOME/.local/bin:$PATH"
+    GUNICORN_CMD="gunicorn"
+fi
 
 # Set PYTHONPATH to include the current directory and apps
 export PYTHONPATH="$(pwd):$(pwd)/apps:$PYTHONPATH"
 
 # Start Gunicorn with optimized settings for Railway
-exec env/bin/gunicorn \
+exec $GUNICORN_CMD \
     --chdir="$(pwd)" \
     --bind=0.0.0.0:8080 \
     --workers=2 \
