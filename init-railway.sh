@@ -62,26 +62,52 @@ print('----------------------------------------')
 print('Global config created.')
 "
 
-# 6. Manually patch Frappe source code for BLOB/TEXT error
+# 6. Manually patch Frappe source code for BLOB/TEXT errors
 echo "Patching Frappe source for compatibility with modern MySQL..."
 python3 -c "
 import json, os, sys
-workspace_json_path = './apps/frappe/frappe/desk/doctype/workspace/workspace.json'
-if not os.path.exists(workspace_json_path):
-    print(f'FATAL: Could not find {workspace_json_path} to patch.', file=sys.stderr)
-    sys.exit(1)
-try:
-    with open(workspace_json_path, 'r') as f: doc = json.load(f)
-    for field in doc.get('fields', []):
-        if field.get('fieldname') == 'content' and 'default' in field:
-            print('Found and removing invalid default from workspace.json')
-            del field['default']
-            break
-    with open(workspace_json_path, 'w') as f: json.dump(doc, f, indent=1)
-    print('Successfully patched workspace.json.')
-except Exception as e:
-    print(f'Error patching workspace.json: {e}', file=sys.stderr)
-    sys.exit(1)
+
+def patch_doctype(path, field_to_patch):
+    if not os.path.exists(path):
+        print(f'WARNING: Could not find {path} to patch. Skipping.', file=sys.stderr)
+        return
+
+    try:
+        with open(path, 'r') as f:
+            doc = json.load(f)
+
+        patched = False
+        for field in doc.get('fields', []):
+            if field.get('fieldname') == field_to_patch and 'default' in field:
+                print(f'Found and removing invalid default for \"{field_to_patch}\" in {path}')
+                del field['default']
+                patched = True
+                break
+        
+        if patched:
+            with open(path, 'w') as f:
+                json.dump(doc, f, indent=1)
+            print(f'Successfully patched {path}.')
+        else:
+            # This is not an error, the field might just not have a default.
+            print(f'Field \"{field_to_patch}\" in {path} did not require patching.')
+
+    except Exception as e:
+        print(f'ERROR: Failed to patch {path}: {e}', file=sys.stderr)
+        # Do not exit, to allow other patches to be attempted.
+
+# List of all known doctypes that are incompatible with strict MySQL.
+# Format is: ('/path/to/file.json', 'field_name_to_fix')
+patches = [
+    ('./apps/frappe/frappe/desk/doctype/workspace/workspace.json', 'content'),
+    ('./apps/frappe/frappe/core/doctype/notification/notification.json', 'message')
+]
+
+print(f'Applying {len(patches)} patches...')
+for path, field_name in patches:
+    patch_doctype(path, field_name)
+
+print('Patching process complete.')
 "
 
 # 7. Create and install site, providing ALL arguments to prevent any defaults.
