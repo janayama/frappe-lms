@@ -1,37 +1,53 @@
-# Quick Railway Setup (Existing MySQL Database)
+# Quick Railway Setup - Frappe LMS
 
-If you already have a MySQL database configured in your Railway project, follow these simplified steps:
+## 🚀 3-Step Setup
 
-## Step 1: Deploy Frappe LMS Service
-
-1. In your Railway project dashboard, click **"+ New"**
-2. Select **"GitHub Repo"**
-3. Choose your forked Frappe LMS repository
-4. Railway will automatically start building and deploying
-
-## Step 2: Configure Required Variables
-
-You only need to set these **2 required variables** in your Frappe LMS service:
-
-```
+### 1. Environment Variables
+Set these 2 variables in Railway:
+```bash
 SITE_NAME=your-app-name.railway.app
-ADMIN_PASSWORD=your-secure-admin-password
+ADMIN_PASSWORD=your-secure-password
 ```
 
-**That's it!** The database variables are automatically available from your existing MySQL service.
+### 2. Deploy
+- Railway will automatically detect the Dockerfile
+- Build takes ~5-10 minutes
+- Uses official `frappe/bench:latest` image
 
-## Step 3: Wait for Deployment
+### 3. Access
+- **URL**: `https://your-app-name.railway.app`
+- **Username**: `Administrator`  
+- **Password**: Your `ADMIN_PASSWORD`
 
-- Initial deployment takes 10-15 minutes
-- Monitor the logs for "Starting Frappe LMS on port 8000..."
-- Railway will provide a public URL once ready
+## ✅ What This Setup Does
 
-## Step 4: Access Your LMS
+1. **Uses Official Frappe Approach**: Same as `frappe/lms` documentation
+2. **Automatic Setup**: Runs `bench init`, `bench get-app lms`, `bench new-site`
+3. **Railway MySQL**: Connects to your existing MySQL service
+4. **Standard Port**: Runs on port 8000 (Frappe default)
 
-- Click on the Railway-provided URL
-- Login with:
-  - **Username**: Administrator
-  - **Password**: [your-admin-password]
+## 🔧 Files Used
+
+- `Dockerfile`: Uses `frappe/bench:latest`
+- `init-railway.sh`: Official setup adapted for Railway
+- `railway.json`: Railway configuration
+
+## 📝 MySQL Variables (Auto-configured)
+
+If you have Railway MySQL service, these are automatically available:
+- `MYSQLHOST`
+- `MYSQLPORT` 
+- `MYSQLDATABASE`
+- `MYSQLUSER`
+- `MYSQLPASSWORD`
+
+## ⏱️ Timeline
+
+- **Build**: 5-10 minutes
+- **Startup**: 2-3 minutes  
+- **Total**: ~8-13 minutes
+
+Much simpler than the previous complex approach! 🎉
 
 ## Optional Variables
 
@@ -42,15 +58,6 @@ PORT=8000                    # Default port (usually not needed)
 ENCRYPTION_KEY=your-key      # For additional security
 SECRET_KEY=your-secret       # For additional security
 ```
-
-## Database Connection
-
-The system automatically uses these variables from your existing MySQL service:
-- ✅ `MYSQLHOST` - Auto-detected
-- ✅ `MYSQLPORT` - Auto-detected  
-- ✅ `MYSQLDATABASE` - Auto-detected
-- ✅ `MYSQLUSER` - Auto-detected
-- ✅ `MYSQLPASSWORD` - Auto-detected
 
 ## Built-in Services
 
