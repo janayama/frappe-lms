@@ -122,9 +122,7 @@ echo "Installing LMS application (no dependencies)..."
 pip3 install --user --no-deps -e apps/lms
 
 # Now install all the dependencies manually, handling conflicts
-echo "Installing required dependencies manually..."
-
-# Install common dependencies
+echo "Installing essential dependencies..."
 pip3 install --user \
     click \
     six \
@@ -155,7 +153,6 @@ pip3 install --user \
     xlrd \
     openpyxl \
     xlsxwriter \
-    pdfkit \
     reportlab \
     num2words \
     frappe-client \
@@ -172,6 +169,14 @@ pip3 install --user \
     pycparser \
     setuptools \
     wheel
+
+# Install Frappe-specific dependencies (some may fail, that's ok)
+echo "Installing Frappe-specific dependencies..."
+pip3 install --user boto3 cryptography dropbox email-reply-parser filetype || echo "Some optional dependencies failed, continuing..."
+
+# Install additional optional dependencies (failures are acceptable)
+echo "Installing optional dependencies..."
+pip3 install --user pyjwt passlib bcrypt maxminddb user-agents ua-parser || echo "Some optional dependencies failed, continuing..."
 
 # Install cairocffi - try LMS version first, fallback to Frappe version
 echo "Installing cairocffi with compatibility check..."
