@@ -50,8 +50,8 @@ echo "--- DIAGNOSTICS END ---"
 echo "Patching Frappe source for compatibility with modern MySQL..."
 python3 -c "
 import json, os, sys
-# This path is based on the standard Frappe app structure.
-workspace_json_path = './apps/frappe/frappe/core/doctype/workspace/workspace.json'
+# This path is now corrected based on diagnostic logs.
+workspace_json_path = './apps/frappe/frappe/desk/doctype/workspace/workspace.json'
 if not os.path.exists(workspace_json_path):
     print(f'FATAL: Could not find {workspace_json_path} to patch.', file=sys.stderr)
     print('The Frappe app source code is missing or incomplete.', file=sys.stderr)
