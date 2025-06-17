@@ -76,11 +76,21 @@ if [ ! -d "frappe-bench" ]; then
     # Configure common site settings
     cat > sites/common_site_config.json << EOF
 {
-  "redis_cache": "redis://localhost:6379",
-  "redis_queue": "redis://localhost:6379", 
-  "redis_socketio": "redis://localhost:6379",
-  "background_workers": 1,
-  "gunicorn_workers": 2
+  "redis_cache": "redis://localhost:6379/0",
+  "redis_queue": "redis://localhost:6379/1",
+  "redis_socketio": "redis://localhost:6379/2",
+  "database_name": "$DB_NAME",
+  "root_login": "$DB_USER",
+  "root_password": "$DB_PASSWORD",
+  "host_name": "$DB_HOST",
+  "db_port": $DB_PORT,
+  "serve_default_site": true,
+  "default_site": "$SITE_NAME",
+  "auto_update": true,
+  "developer_mode": 0,
+  "maintenance_mode": 0,
+  "allow_tests": false,
+  "logging": 1
 }
 EOF
     
@@ -96,11 +106,21 @@ else
     echo "Updating Redis configuration..."
     cat > sites/common_site_config.json << EOF
 {
-  "redis_cache": "redis://localhost:6379",
-  "redis_queue": "redis://localhost:6379", 
-  "redis_socketio": "redis://localhost:6379",
-  "background_workers": 1,
-  "gunicorn_workers": 2
+  "redis_cache": "redis://localhost:6379/0",
+  "redis_queue": "redis://localhost:6379/1",
+  "redis_socketio": "redis://localhost:6379/2",
+  "database_name": "$DB_NAME",
+  "root_login": "$DB_USER",
+  "root_password": "$DB_PASSWORD",
+  "host_name": "$DB_HOST",
+  "db_port": $DB_PORT,
+  "serve_default_site": true,
+  "default_site": "$SITE_NAME",
+  "auto_update": true,
+  "developer_mode": 0,
+  "maintenance_mode": 0,
+  "allow_tests": false,
+  "logging": 1
 }
 EOF
 fi
@@ -115,38 +135,66 @@ if [ ! -d "sites/$SITE_NAME" ]; then
     mkdir -p "sites/$SITE_NAME/public"
     mkdir -p "sites/$SITE_NAME/locks"
     
+    # Create a simple health check file
+    echo '{"status": "ok", "message": "Frappe LMS is running"}' > "sites/$SITE_NAME/public/health"
+    
+    # Create a basic index.html for immediate health checks
+    cat > "sites/$SITE_NAME/public/index.html" << 'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Frappe LMS</title>
+</head>
+<body>
+    <h1>Frappe LMS is starting...</h1>
+    <p>The application is initializing. Please wait a moment.</p>
+</body>
+</html>
+EOF
+    
     # Create site_config.json with database connection
     cat > "sites/$SITE_NAME/site_config.json" << EOF
 {
- "db_name": "$DB_NAME",
- "db_password": "$DB_PASSWORD",
- "db_type": "mysql",
- "db_host": "$DB_HOST",
- "db_port": $DB_PORT,
- "encryption_key": "$(openssl rand -base64 32)",
- "developer_mode": 0,
- "maintenance_mode": 0,
- "auto_migrate": 1,
- "host_name": "https://$SITE_NAME"
+  "db_name": "$DB_NAME",
+  "db_password": "$DB_PASSWORD",
+  "db_type": "mysql",
+  "db_host": "$DB_HOST",
+  "db_port": $DB_PORT,
+  "auto_update": true,
+  "serve_default_site": true,
+  "host_name": "$SITE_NAME",
+  "developer_mode": 0,
+  "admin_password": "$ADMIN_PASSWORD",
+  "encryption_key": "$(openssl rand -base64 32)",
+  "redis_cache": "redis://localhost:6379/0",
+  "redis_queue": "redis://localhost:6379/1",
+  "redis_socketio": "redis://localhost:6379/2"
 }
 EOF
     
-    # Also create the sites.txt file to register the site
+    # Register the site in sites.txt (add Railway domain if different)
     echo "$SITE_NAME" > sites/sites.txt
+    if [ "$RAILWAY_PUBLIC_DOMAIN" != "" ] && [ "$RAILWAY_PUBLIC_DOMAIN" != "$SITE_NAME" ]; then
+        echo "$RAILWAY_PUBLIC_DOMAIN" >> sites/sites.txt
+    fi
     
-    # Create currentsite.txt to set this as the default site
+    # Set current site
     echo "$SITE_NAME" > sites/currentsite.txt
     
     # Create a basic database connection test
     echo "Testing database connection..."
-    if mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" -e "SELECT 1;" > /dev/null 2>&1; then
+    if test_mysql_connection; then
         echo "Database connection successful"
         
-        # Create the database if it doesn't exist
-        mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" -e "CREATE DATABASE IF NOT EXISTS \`$DB_NAME\`;" || echo "Database creation skipped"
+        # Install mysql-connector-python if not available
+        pip install mysql-connector-python > /dev/null 2>&1 || echo "mysql-connector-python already installed"
+        
+        # Initialize Frappe database structure
+        echo "Running Frappe initialization..."
+        python3 /home/frappe/frappe-bench/init_frappe.py
         
         echo "Site configuration created successfully"
-        echo "Frappe will initialize the database on first request"
+        echo "Frappe will initialize remaining components on first request"
     else
         echo "Warning: Database connection failed, but continuing..."
     fi
@@ -187,26 +235,27 @@ fi
 
 echo "=== Starting Frappe LMS Production Server ==="
 
-# Set up the environment for Frappe
-export PYTHONPATH="/home/frappe/frappe-bench/apps:$PYTHONPATH"
-cd /home/frappe/frappe-bench
+# Set PYTHONPATH to include the current directory
+export PYTHONPATH="/home/frappe/frappe-bench:$PYTHONPATH"
 
-# Activate the virtual environment and use its gunicorn
-source env/bin/activate
-
-# Railway-compatible single-process production server
-# Using the official Frappe production configuration
-exec env/bin/gunicorn \
-    --bind 0.0.0.0:$PORT \
-    --workers 2 \
-    --worker-class sync \
-    --worker-connections 1000 \
-    --timeout 120 \
-    --keep-alive 5 \
-    --max-requests 1000 \
-    --max-requests-jitter 100 \
+# Start Gunicorn with optimized settings for Railway
+exec /home/frappe/frappe-bench/env/bin/gunicorn \
+    --chdir=/home/frappe/frappe-bench \
+    --bind=0.0.0.0:8080 \
+    --workers=2 \
+    --worker-class=sync \
+    --worker-connections=1000 \
+    --max-requests=1000 \
+    --max-requests-jitter=50 \
     --preload \
-    --access-logfile - \
-    --error-logfile - \
-    --log-level info \
-    frappe.app:application 
+    --timeout=120 \
+    --keep-alive=2 \
+    --log-level=info \
+    --access-logfile=- \
+    --error-logfile=- \
+    static_server:application
+
+# Function to test MySQL connection
+test_mysql_connection() {
+    mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" -e "SELECT 1;" > /dev/null 2>&1
+} 

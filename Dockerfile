@@ -21,20 +21,22 @@ USER frappe
 WORKDIR /home/frappe
 
 # Copy the initialization script and health check
-COPY entrypoint.sh /home/frappe/entrypoint.sh
-COPY healthcheck.sh /home/frappe/healthcheck.sh
+COPY entrypoint.sh /home/frappe/frappe-bench/
+COPY healthcheck.sh /home/frappe/frappe-bench/
+COPY init_frappe.py /home/frappe/frappe-bench/
+COPY static_server.py /home/frappe/frappe-bench/
 
 # Make the scripts executable
-USER root
-RUN chmod +x /home/frappe/entrypoint.sh /home/frappe/healthcheck.sh
-USER frappe
+RUN chmod +x /home/frappe/frappe-bench/entrypoint.sh && \
+    chmod +x /home/frappe/frappe-bench/healthcheck.sh && \
+    chmod +x /home/frappe/frappe-bench/init_frappe.py
 
-# Expose port
-EXPOSE 8000
+# Set the working directory
+WORKDIR /home/frappe/frappe-bench
 
-# Health check - Railway optimized
-HEALTHCHECK --interval=60s --timeout=30s --start-period=180s --retries=3 \
-    CMD /home/frappe/healthcheck.sh
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=300s --retries=3 \
+    CMD ./healthcheck.sh
 
-# Use entrypoint script
-ENTRYPOINT ["/home/frappe/entrypoint.sh"] 
+# Set entrypoint
+ENTRYPOINT ["./entrypoint.sh"] 
