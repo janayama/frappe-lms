@@ -139,7 +139,7 @@ echo "Site '$SITE_NAME' configured. Installing apps directly..."
 bench use "$SITE_NAME"
 
 echo "Installing Frappe framework into the database..."
-bench --site "$SITE_NAME" install-app frappe --verbose
+bench --site "$SITE_NAME" install-app frappe
 
 echo "Setting admin password..."
 bench --site "$SITE_NAME" set-admin-password "$ADMIN_PASSWORD"
@@ -148,7 +148,7 @@ echo "Getting LMS app..."
 bench get-app lms
 
 echo "Installing LMS app into the database..."
-bench --site "$SITE_NAME" install-app lms --verbose
+bench --site "$SITE_NAME" install-app lms
 
 echo "Setting production mode and clearing cache..."
 bench --site "$SITE_NAME" set-config developer_mode 0
