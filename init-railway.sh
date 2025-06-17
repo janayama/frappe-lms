@@ -59,10 +59,11 @@ if [ ! -d "sites/$SITE_NAME" ]; then
         --db-host "$DB_HOST" \
         --db-port "$DB_PORT" \
         --db-name "$DB_NAME" \
-        --db-user "$DB_USER" \
-        --db-password "$DB_PASSWORD" \
+        --mariadb-root-username "$DB_USER" \
+        --mariadb-root-password "$DB_PASSWORD" \
         --admin-password "$ADMIN_PASSWORD" \
-        --force
+        --force \
+        --no-mariadb-socket
 
     # Install the LMS app on the new site.
     echo "Installing LMS app on site..."
