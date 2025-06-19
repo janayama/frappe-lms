@@ -35,12 +35,21 @@ cat <<EOF > "sites/$SITE_NAME/site_config.json"
     "db_name": "$MARIADB_DATABASE",
     "db_password": "$MARIADB_PASSWORD",
     "db_port": $MARIADB_PORT,
-    "db_user": "$MARIADB_USER"
+    "db_user": "$MARIADB_USER",
+    "db_type": "mariadb"
 }
 EOF
 
 echo "$SITE_NAME" > sites/sites.txt
 bench use "$SITE_NAME"
+
+# --- DIAGNOSTICS ---
+echo "--- [frappe] Verifying configuration ---"
+echo "--- common_site_config.json:"
+cat sites/common_site_config.json
+echo "--- $SITE_NAME/site_config.json:"
+cat "sites/$SITE_NAME/site_config.json"
+echo "---"
 
 # Check if the site is installed by checking its status.
 if ! bench --site "$SITE_NAME" status > /dev/null 2>&1; then
