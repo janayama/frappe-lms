@@ -10,15 +10,18 @@ cd /home/frappe/frappe-bench
 # Set the site name from the SITE_NAME environment variable provided by Railway
 SITE_NAME=${SITE_NAME:-"lms.localhost"}
 
-# STEP 1: Configure the global bench settings to point to the remote services.
-# This is the most reliable way to ensure all commands know where to connect.
-bench config set-db-host "$MARIADB_HOST"
-bench config set-redis-cache "$REDIS_URL"
-bench config set-redis-queue "$REDIS_URL"
-bench config set-redis-socketio "$REDIS_URL"
+# STEP 1: Manually create the global config file.
+# This bypasses the unreliable `bench config` subcommands entirely.
+cat <<EOF > sites/common_site_config.json
+{
+    "db_host": "$MARIADB_HOST",
+    "redis_cache": "$REDIS_URL",
+    "redis_queue": "$REDIS_URL",
+    "redis_socketio": "$REDIS_URL"
+}
+EOF
 
 # STEP 2: Always create the site's required directory structure.
-# This prevents FileNotFoundError for logs.
 mkdir -p sites/$SITE_NAME/logs
 touch sites/$SITE_NAME/logs/database.log
 touch sites/$SITE_NAME/logs/frappe.log
@@ -36,20 +39,18 @@ EOF
 # STEP 4: Register the site in sites.txt so the bench knows about it.
 echo "$SITE_NAME" > sites/sites.txt
 
-# STEP 5: Check if the site is installed by looking for a core Frappe table.
-# This uses the 'mariadb' command, which is correct for this environment.
-INSTALLED=$(echo "SHOW TABLES LIKE 'tabDocType';" | bench --site "$SITE_NAME" mariadb | grep 'tabDocType' || echo "")
+# STEP 5: Check if the site is installed using a direct Python command.
+IS_INSTALLED_SCRIPT="import frappe, os; frappe.init(os.environ.get('SITE_NAME')); frappe.connect(); print('1' if frappe.db.table_exists('User') else '0'); frappe.db.close()"
+INSTALLED=$(python3 -c "$IS_INSTALLED_SCRIPT")
 
 # STEP 6: Run first-time installation or updates.
 if [ "$INSTALLED" = "0" ]; then
     echo "Database for $SITE_NAME appears to be empty. Running first-time installation..."
-    # A. Run migrate using our robust python script from its new location.
     python3 /usr/local/bin/run_migrate.py
-    # B. Set the admin password non-interactively.
     bench --site "$SITE_NAME" set-admin-password "$ADMIN_PASSWORD"
+    bench --site "$SITE_NAME" install-app lms
 else
     echo "Database for $SITE_NAME is already installed. Running migrations for updates."
-    # On subsequent deploys, just run migrate using our python script.
     python3 /usr/local/bin/run_migrate.py
 fi
 
