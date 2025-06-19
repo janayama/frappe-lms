@@ -3,7 +3,7 @@ FROM frappe/bench:latest as frappe-lms-app
 # Frappe's bench image is based on Debian. We need to install NodeJS and Yarn.
 USER root
 RUN apt-get update && \
-    apt-get install -y curl && \
+    apt-get install -y curl expect && \
     curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
     npm install -g yarn && \
@@ -15,6 +15,8 @@ COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 COPY run_migrate.py /usr/local/bin/run_migrate.py
 RUN chmod +x /usr/local/bin/run_migrate.py
+COPY setup_site.exp /usr/local/bin/setup_site.exp
+RUN chmod +x /usr/local/bin/setup_site.exp
 
 USER frappe
 

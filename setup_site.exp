@@ -1,0 +1,21 @@
+#!/usr/bin/expect -f
+# This script automates the `bench new-site` command.
+
+# Set a timeout for expect commands.
+set timeout 60
+
+# Get the site name from the first command-line argument.
+set site [lindex $argv 0]
+
+# Start the `bench new-site` command.
+spawn bench new-site $site
+
+# Expect the prompt for "MySQL root password".
+expect "MySQL root password: "
+
+# Send a dummy password. The password itself doesn't matter
+# as we will overwrite the config file immediately after.
+send "dummy_password\r"
+
+# Wait for the command to complete.
+expect eof 
