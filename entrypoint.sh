@@ -10,19 +10,15 @@ cd /home/frappe/frappe-bench
 # Set the site name from the SITE_NAME environment variable provided by Railway
 SITE_NAME=${SITE_NAME:-"lms.localhost"}
 
-# Configure bench to use the Railway environment variables for Redis.
-# The REDIS_URL variable contains all connection info, including the password.
-bench set-redis-cache-host "$REDIS_URL"
-bench set-redis-queue-host "$REDIS_URL"
-bench set-redis-socketio-host "$REDIS_URL"
-
 # Check if the site directory exists. If not, this is the first deployment.
-if [ ! -d "sites/$SITE_NAME" ]; then
+if [ ! -f "sites/$SITE_NAME/site_config.json" ]; then
     echo "Site $SITE_NAME does not exist. Creating and installing for the first time..."
 
-    # 1. Manually create the site directory and the site_config.json file.
-    # This is the key to bypassing the 'new-site' command's user creation,
-    # which fails on managed databases.
+    # 1. Register the site in sites.txt
+    echo "$SITE_NAME" > sites/sites.txt
+
+    # 2. Manually create the site directory and a single, comprehensive site_config.json file.
+    # This is the key to bypassing the 'new-site' command's permission issues and centralizes all config.
     mkdir -p sites/$SITE_NAME
     cat <<EOF > sites/$SITE_NAME/site_config.json
 {
@@ -31,11 +27,12 @@ if [ ! -d "sites/$SITE_NAME" ]; then
     "db_password": "$MARIADB_PASSWORD",
     "db_port": $MARIADB_PORT,
     "db_user": "$MARIADB_USER",
+    "redis_cache": "$REDIS_URL",
+    "redis_queue": "$REDIS_URL",
+    "redis_socketio": "$REDIS_URL",
     "developer_mode": 1
 }
 EOF
-    # 2. Add the site to the list of sites for the bench.
-    echo "$SITE_NAME" > sites/common_site_config.json
 
     # 3. Use 'reinstall' to populate the database.
     # This creates all the base Frappe tables and the Administrator user
