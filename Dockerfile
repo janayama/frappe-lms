@@ -10,12 +10,11 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy the entrypoint script and make it executable
+# Copy scripts to a standard executable path and make them executable
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
-
-# Copy the migration script
-COPY run_migrate.py /home/frappe/frappe-bench/run_migrate.py
+COPY run_migrate.py /usr/local/bin/run_migrate.py
+RUN chmod +x /usr/local/bin/run_migrate.py
 
 USER frappe
 
@@ -29,25 +28,25 @@ RUN bench init --skip-redis-config-generation frappe-bench
 # Set the working directory to the newly created bench
 WORKDIR /home/frappe/frappe-bench
 
-# Copy your local app code into a temporary directory inside the container
-COPY --chown=frappe:frappe . /app_source
+# Switch to root to copy app files directly into the bench directory.
+# This avoids all 'mv' permission errors.
+USER root
+COPY --chown=frappe:frappe ./lms ./apps/lms
+COPY --chown=frappe:frappe ./frontend ./apps/lms/frontend
+COPY --chown=frappe:frappe ./pyproject.toml ./apps/lms/pyproject.toml
+RUN touch ./apps/lms/README.md && chown frappe:frappe ./apps/lms/README.md
 
-# Move the 'lms' python app and its 'frontend' code into the bench's apps directory.
-# This makes your app available to the bench.
-RUN mv /app_source/lms ./apps/
-RUN mv /app_source/frontend ./apps/lms/frontend
-RUN mv /app_source/pyproject.toml ./apps/lms/
-RUN touch ./apps/lms/README.md
+# Switch back to the frappe user for all subsequent build steps.
+USER frappe
 
-# Install the LMS app's Python dependencies from its pyproject.toml
+# Install Python dependencies
 RUN bench setup requirements --python && \
     pip install -e ./apps/lms
 
-# Install the LMS app's Node.js dependencies
+# Install Node.js dependencies
 RUN bench setup requirements --node
 
-# Build the frontend assets.
-# We set the PYTHONPATH to include the 'apps' directory to ensure the 'lms' module can be found during build.
+# Build the frontend assets
 RUN PYTHONPATH=$(pwd)/apps:$PYTHONPATH bench build --app lms
 
 # Expose the port Frappe runs on

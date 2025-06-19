@@ -41,18 +41,16 @@ echo "$SITE_NAME" > sites/sites.txt
 INSTALLED=$(echo "SHOW TABLES LIKE 'tabDocType';" | bench --site "$SITE_NAME" mariadb | grep 'tabDocType' || echo "")
 
 # STEP 6: Run first-time installation or updates.
-if [ -z "$INSTALLED" ]; then
+if [ "$INSTALLED" = "0" ]; then
     echo "Database for $SITE_NAME appears to be empty. Running first-time installation..."
-    # A. Run migrate. On an empty DB, this creates the entire schema.
-    bench --site "$SITE_NAME" migrate
+    # A. Run migrate using our robust python script from its new location.
+    python3 /usr/local/bin/run_migrate.py
     # B. Set the admin password non-interactively.
     bench --site "$SITE_NAME" set-admin-password "$ADMIN_PASSWORD"
-    # C. Install the 'lms' app, which runs its own migrations.
-    bench --site "$SITE_NAME" install-app lms
 else
     echo "Database for $SITE_NAME is already installed. Running migrations for updates."
-    # On subsequent deploys, just run migrate to apply any new changes.
-    bench --site "$SITE_NAME" migrate
+    # On subsequent deploys, just run migrate using our python script.
+    python3 /usr/local/bin/run_migrate.py
 fi
 
 echo "Starting Frappe server..."
