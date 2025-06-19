@@ -6,7 +6,7 @@ authors = [
 description = "Easy to use, open source, Learning Management System"
 requires-python = ">=3.10"
 readme = "README.md"
-dynamic = ["version"]
+version = "2.31.0"
 dependencies = [
     # core dependencies
     "websocket_client~=1.6.4",
