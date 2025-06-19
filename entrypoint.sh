@@ -48,18 +48,22 @@ su -m frappe <<'EOF'
 set -e
 cd /home/frappe/frappe-bench
 
+# This is the CRITICAL FIX: Activate the virtual environment.
+# This sets up the correct PATH and environment for all `bench` commands.
+source ./env/bin/activate
+
 # Set the active site for the bench context. This creates currentsite.txt.
 bench use "$SITE_NAME"
 
 # Check if the site is installed by checking its status.
 if ! bench --site "$SITE_NAME" status > /dev/null 2>&1; then
     echo "--- [frappe] Database not installed. Running first-time setup... ---"
-    ./env/bin/python /usr/local/bin/run_migrate.py "$SITE_NAME"
+    python /usr/local/bin/run_migrate.py "$SITE_NAME"
     bench --site "$SITE_NAME" set-admin-password "$ADMIN_PASSWORD"
     bench --site "$SITE_NAME" install-app lms
 else
     echo "--- [frappe] Database is already installed. Running migrations... ---"
-    ./env/bin/python /usr/local/bin/run_migrate.py "$SITE_NAME"
+    python /usr/local/bin/run_migrate.py "$SITE_NAME"
 fi
 
 echo "--- [frappe] Starting Frappe server... ---"
