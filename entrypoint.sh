@@ -44,7 +44,9 @@ chown -R frappe:frappe /home/frappe/frappe-bench/sites
 echo "--- [ROOT] Configuration complete. Switching to user 'frappe'... ---"
 
 # STEP 3: Switch to the 'frappe' user and execute the rest of the logic.
-su -m frappe <<'EOF'
+# We explicitly use `/bin/bash` to ensure the `source` command is available.
+su -m frappe -s /bin/bash <<'EOF'
+#!/bin/bash
 set -e
 cd /home/frappe/frappe-bench
 
