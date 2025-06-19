@@ -34,7 +34,7 @@ COPY --chown=frappe:frappe . /app_source
 RUN mv /app_source/lms ./apps/
 RUN mv /app_source/frontend ./apps/lms/frontend
 RUN mv /app_source/pyproject.toml ./apps/lms/
-RUN mv /app_source/README.md ./apps/lms/
+RUN touch ./apps/lms/README.md
 
 # Install the LMS app's Python dependencies from its pyproject.toml
 RUN bench setup requirements --python && \
