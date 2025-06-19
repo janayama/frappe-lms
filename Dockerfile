@@ -7,7 +7,7 @@ RUN apt-get update && \
     curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
     npm install -g yarn && \
-    apt-get install -y --no-install-recommends mariadb-client-10.5 redis-tools vim-tiny && \
+    apt-get install -y --no-install-recommends mariadb-client redis-tools vim-tiny && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
