@@ -6,13 +6,13 @@ import frappe
 def main():
     """
     This script programmatically runs Frappe migrations.
-    It bypasses the `bench migrate` command, which has proven unreliable
-    for reading remote database configurations in this environment.
+    It takes the site name as a command-line argument to ensure reliability.
     """
-    site = os.environ.get("SITE_NAME")
-    if not site:
-        print("ERROR: SITE_NAME environment variable is not set.", file=sys.stderr)
+    if len(sys.argv) < 2:
+        print("ERROR: Site name must be provided as a command-line argument.", file=sys.stderr)
         sys.exit(1)
+
+    site = sys.argv[1]
 
     try:
         frappe.init(site=site)

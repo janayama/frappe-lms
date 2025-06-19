@@ -7,12 +7,10 @@ set -e
 # Navigate to the bench directory
 cd /home/frappe/frappe-bench
 
-# EXPORT is the crucial keyword that makes the SITE_NAME variable available
-# to all child processes, including the Python scripts below.
-export SITE_NAME=${SITE_NAME:-"lms.localhost"}
+# Set a shell variable for the site name.
+SITE_NAME=${SITE_NAME:-"lms.localhost"}
 
-# STEP 1: Manually create the global config file.
-# This bypasses the unreliable `bench config` subcommands entirely.
+# STEP 1: Manually create all config files and directories.
 cat <<EOF > sites/common_site_config.json
 {
     "db_host": "$MARIADB_HOST",
@@ -22,13 +20,11 @@ cat <<EOF > sites/common_site_config.json
 }
 EOF
 
-# STEP 2: Always create the site's required directory structure.
-mkdir -p sites/$SITE_NAME/logs
-touch sites/$SITE_NAME/logs/database.log
-touch sites/$SITE_NAME/logs/frappe.log
+mkdir -p "sites/$SITE_NAME/logs"
+touch "sites/$SITE_NAME/logs/database.log"
+touch "sites/$SITE_NAME/logs/frappe.log"
 
-# STEP 3: Create the site-specific config with the remaining details.
-cat <<EOF > sites/$SITE_NAME/site_config.json
+cat <<EOF > "sites/$SITE_NAME/site_config.json"
 {
     "db_name": "$MARIADB_DATABASE",
     "db_password": "$MARIADB_PASSWORD",
@@ -37,22 +33,27 @@ cat <<EOF > sites/$SITE_NAME/site_config.json
 }
 EOF
 
-# STEP 4: Register the site in sites.txt so the bench knows about it.
+# STEP 2: Register the site in sites.txt so the bench knows about it.
 echo "$SITE_NAME" > sites/sites.txt
 
-# STEP 5: Check if the site is installed using the bench's python virtual environment.
-IS_INSTALLED_SCRIPT="import frappe, os; frappe.init(os.environ.get('SITE_NAME')); frappe.connect(); print('1' if frappe.db.table_exists('User') else '0'); frappe.db.close()"
+# STEP 3: Check if the site is installed using a direct Python command.
+# The site name is directly injected into the script to avoid environment variable issues.
+IS_INSTALLED_SCRIPT="import frappe; frappe.init('$SITE_NAME'); frappe.connect(); print('1' if frappe.db.table_exists('User') else '0'); frappe.db.close()"
 INSTALLED=$(./env/bin/python -c "$IS_INSTALLED_SCRIPT")
 
-# STEP 6: Run first-time installation or updates.
+# STEP 4: Run first-time installation or updates.
 if [ "$INSTALLED" = "0" ]; then
     echo "Database for $SITE_NAME appears to be empty. Running first-time installation..."
-    ./env/bin/python /usr/local/bin/run_migrate.py
+    # A. Run migrate, passing the site name as an argument.
+    ./env/bin/python /usr/local/bin/run_migrate.py "$SITE_NAME"
+    # B. Set the admin password.
     bench --site "$SITE_NAME" set-admin-password "$ADMIN_PASSWORD"
+    # C. Install the 'lms' app.
     bench --site "$SITE_NAME" install-app lms
 else
     echo "Database for $SITE_NAME is already installed. Running migrations for updates."
-    ./env/bin/python /usr/local/bin/run_migrate.py
+    # On subsequent deploys, run migrate, passing the site name as an argument.
+    ./env/bin/python /usr/local/bin/run_migrate.py "$SITE_NAME"
 fi
 
 echo "Starting Frappe server..."
