@@ -1,18 +1,21 @@
 #!/bin/bash
 set -e
 
-# This script runs as ROOT.
+# This is the CRITICAL FIX:
+# Explicitly set the PATH to prioritize the virtual environment's executables.
+# This ensures we use the correct `bench` and `python` commands throughout the script.
+export PATH="/home/frappe/frappe-bench/env/bin:$PATH"
 
-# Since we are root, we need to cd to the correct directory.
+# From this point on, all `bench` and `python` commands will use the correct environment.
+
 cd /home/frappe/frappe-bench
-
-# Export these variables so the `su` sub-shell can see them.
 export SITE_NAME=${SITE_NAME:-"lms.localhost"}
-export ADMIN_PASSWORD=${ADMIN_PASSWORD}
 
-echo "--- [ROOT] Configuring site: $SITE_NAME ---"
+# Manually create all config files and directories.
+# Since the entrypoint now runs as `frappe`, we don't need root or chown.
+# The user already has permission to write to its own home directory.
+echo "--- [frappe] Configuring site: $SITE_NAME ---"
 
-# STEP 1: Manually create all config files and directories as root.
 cat <<EOF > sites/common_site_config.json
 {
     "db_host": "$MARIADB_HOST",
@@ -37,24 +40,6 @@ cat <<EOF > "sites/$SITE_NAME/site_config.json"
 EOF
 
 echo "$SITE_NAME" > sites/sites.txt
-
-# STEP 2: Fix all permissions BEFORE switching user.
-chown -R frappe:frappe /home/frappe/frappe-bench/sites
-
-echo "--- [ROOT] Configuration complete. Switching to user 'frappe'... ---"
-
-# STEP 3: Switch to the 'frappe' user and execute the rest of the logic.
-# We explicitly use `/bin/bash` to ensure the `source` command is available.
-su -m frappe -s /bin/bash <<'EOF'
-#!/bin/bash
-set -e
-cd /home/frappe/frappe-bench
-
-# This is the CRITICAL FIX: Activate the virtual environment.
-# This sets up the correct PATH and environment for all `bench` commands.
-source ./env/bin/activate
-
-# Set the active site for the bench context. This creates currentsite.txt.
 bench use "$SITE_NAME"
 
 # Check if the site is installed by checking its status.
@@ -69,5 +54,4 @@ else
 fi
 
 echo "--- [frappe] Starting Frappe server... ---"
-bench start
-EOF 
+bench start 

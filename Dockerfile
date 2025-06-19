@@ -51,7 +51,7 @@ RUN PYTHONPATH=$(pwd)/apps:$PYTHONPATH bench build --app lms
 
 # Final setup for the container
 EXPOSE 8000
-# Run the entrypoint as root to have permission to create site configs.
-USER root
+# Run the entrypoint as the application user.
+USER frappe
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["-"] 
