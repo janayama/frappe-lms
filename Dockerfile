@@ -40,10 +40,12 @@ RUN touch ./apps/lms/README.md
 RUN bench setup requirements --python && \
     pip install -e ./apps/lms
 
-# Install the LMS app's Node.js dependencies and build the frontend assets.
-# `bench build` is the standard Frappe command to compile and place assets correctly.
-RUN bench setup requirements --node && \
-    bench build --app lms
+# Install the LMS app's Node.js dependencies
+RUN bench setup requirements --node
+
+# Build the frontend assets.
+# We set the PYTHONPATH to include the 'apps' directory to ensure the 'lms' module can be found during build.
+RUN PYTHONPATH=$(pwd)/apps:$PYTHONPATH bench build --app lms
 
 # Expose the port Frappe runs on
 EXPOSE 8000
