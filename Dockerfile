@@ -9,6 +9,11 @@ RUN apt-get update && \
     npm install -g yarn && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+# Copy the entrypoint script and make it executable
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 USER frappe
 
 # Set the working directory to the user's home
