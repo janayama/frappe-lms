@@ -35,12 +35,15 @@ cat <<EOF > "sites/$SITE_NAME/site_config.json"
     "db_name": "$MARIADB_DATABASE",
     "db_password": "$MARIADB_PASSWORD",
     "db_port": $MARIADB_PORT,
-    "db_user": "$MARIADB_USER"
+    "db_user": "$USER"
 }
 EOF
 
 # STEP 2: Register the site in sites.txt so the bench knows about it.
 echo "$SITE_NAME" > sites/sites.txt
+# This is the final, critical step. The currentsite.txt file explicitly
+# tells the framework which site is active, resolving the IncorrectSitePath error.
+echo "$SITE_NAME" > sites/currentsite.txt
 
 # --- DIAGNOSTICS: Print file system state after creation ---
 echo "--- Configuration files created. Verifying contents... ---"
@@ -52,6 +55,9 @@ cat sites/sites.txt
 echo "---"
 echo "Contents of common_site_config.json:"
 cat sites/common_site_config.json
+echo "---"
+echo "Contents of currentsite.txt:"
+cat sites/currentsite.txt
 echo "---"
 echo "Contents of $SITE_NAME/site_config.json:"
 cat "sites/$SITE_NAME/site_config.json"
