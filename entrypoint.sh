@@ -10,9 +10,8 @@ cd /home/frappe/frappe-bench
 # Set the site name from the SITE_NAME environment variable provided by Railway
 SITE_NAME=${SITE_NAME:-"lms.localhost"}
 
-# STEP 1: Always create the site's configuration.
-# This ensures a fresh, correct config on every deploy, pointing to the Railway services.
-mkdir -p sites/$SITE_NAME
+# STEP 1: Always create the site's configuration directories and files.
+mkdir -p sites/$SITE_NAME/logs
 cat <<EOF > sites/$SITE_NAME/site_config.json
 {
     "db_host": "$MARIADB_HOST",
