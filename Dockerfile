@@ -7,49 +7,38 @@ RUN apt-get update && \
     curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
     npm install -g yarn && \
+    apt-get install -y --no-install-recommends mariadb-client-10.5 redis-tools vim-tiny && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+# Create a non-root user 'frappe'
+RUN useradd -m -s /bin/bash frappe
 
 # Copy scripts to a standard executable path and make them executable
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
+# --- Switch to non-root user for the rest of the build and for runtime ---
 USER frappe
-
-# Set the working directory to the user's home
 WORKDIR /home/frappe
 
-# Initialize a new bench. This creates the directory structure and installs Frappe framework.
-# We skip redis config generation because we will provide it via environment variables.
-RUN bench init --skip-redis-config-generation frappe-bench
+# Set path for python packages and the bench environment
+ENV PATH="/home/frappe/.local/bin:/home/frappe/frappe-bench/env/bin:$PATH"
 
-# Set the working directory to the newly created bench
+# Install bench and initialize the bench directory in a single layer
+RUN pip3 install frappe-bench && \
+    bench init --skip-redis-config-generation --frappe-branch version-15 frappe-bench
+
+# Set the working directory to the bench directory
 WORKDIR /home/frappe/frappe-bench
 
-# Switch to root to copy app files directly into the bench directory.
-# This avoids all 'mv' permission errors.
-USER root
-COPY --chown=frappe:frappe ./lms ./apps/lms
-COPY --chown=frappe:frappe ./frontend ./apps/lms/frontend
-COPY --chown=frappe:frappe ./pyproject.toml ./apps/lms/pyproject.toml
-RUN touch ./apps/lms/README.md && chown frappe:frappe ./apps/lms/README.md
-
-# Switch back to the frappe user for all subsequent build steps.
-USER frappe
-
-# Install Python dependencies
-RUN bench setup requirements --python && \
-    pip install -e ./apps/lms
-
-# Install Node.js dependencies
-RUN bench setup requirements --node
-
-# Build the frontend assets
-RUN PYTHONPATH=$(pwd)/apps:$PYTHONPATH bench build --app lms
+# Install the custom 'lms' app and build assets
+COPY --chown=frappe:frappe . /home/frappe/frappe-bench/apps/lms
+RUN bench get-app lms && \
+    bench build
 
 # Final setup for the container
 EXPOSE 8000
 # Run the entrypoint as the application user.
-USER frappe
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["-"] 

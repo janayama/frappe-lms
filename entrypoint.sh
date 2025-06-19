@@ -1,67 +1,49 @@
 #!/bin/bash
 set -e
 
-# This script runs as ROOT.
+# This script runs as the 'frappe' user, as defined in the Dockerfile.
+# The PATH is correctly set in the Dockerfile, so `bench` is available.
 cd /home/frappe/frappe-bench
 
-# Export these variables so the `su` sub-shell can see them.
-export SITE_NAME=${SITE_NAME:-"lms.localhost"}
-export ADMIN_PASSWORD=${ADMIN_PASSWORD}
+# Use SITE_NAME from env, default if not set.
+SITE_NAME=${SITE_NAME:-"lms.localhost"}
 
-# STEP 1: Manually create all config files and directories as root.
-echo "--- [ROOT] Creating configuration files... ---"
-cat <<EOF > sites/common_site_config.json
+# If the site directory doesn't exist, this is a first-time run.
+if [ ! -d "sites/$SITE_NAME" ]; then
+    echo "--- [frappe] Site '$SITE_NAME' not found. Running first-time setup... ---"
+
+    # 1. Create site config files with credentials from environment variables.
+    cat <<EOF > sites/common_site_config.json
 {
     "db_host": "$MARIADB_HOST",
+    "db_port": $MARIADB_PORT,
     "redis_cache": "$REDIS_URL",
     "redis_queue": "$REDIS_URL",
     "redis_socketio": "$REDIS_URL"
 }
 EOF
 
-mkdir -p "sites/$SITE_NAME/logs"
-touch "sites/$SITE_NAME/logs/database.log"
-touch "sites/$SITE_NAME/logs/frappe.log"
-
-cat <<EOF > "sites/$SITE_NAME/site_config.json"
+    cat <<EOF > "sites/$SITE_NAME/site_config.json"
 {
     "db_name": "$MARIADB_DATABASE",
     "db_password": "$MARIADB_PASSWORD",
-    "db_port": $MARIADB_PORT,
-    "db_user": "$MARIADB_USER",
-    "db_type": "mariadb"
+    "db_user": "$MARIADB_USER"
 }
 EOF
 
-echo "$SITE_NAME" > sites/sites.txt
+    # 2. Use `bench reinstall` for a robust, idempotent setup.
+    # It creates the DB schema and sets the admin password.
+    bench --site "$SITE_NAME" reinstall --yes --admin-password "$ADMIN_PASSWORD"
+    bench --site "$SITE_NAME" install-app lms
+    # Set the default site for future bench commands.
+    bench use "$SITE_NAME"
 
-# STEP 2: Fix all permissions BEFORE switching user.
-chown -R frappe:frappe /home/frappe/frappe-bench/sites
-
-echo "--- [ROOT] Configuration complete. Switching to user 'frappe'... ---"
-
-# STEP 3: Switch to the 'frappe' user and execute the rest of the logic.
-# The `-c` flag runs the provided command string in a new shell.
-# We activate the virtualenv and then run the standard bench commands.
-su -m frappe -c "
-set -e
-cd /home/frappe/frappe-bench
-source env/bin/activate
-
-echo '--- [frappe] Bench environment activated. ---'
-
-bench use '$SITE_NAME'
-
-if ! bench --site '$SITE_NAME' status > /dev/null 2>&1; then
-    echo '--- [frappe] Database not installed. Running first-time setup... ---'
-    bench --site '$SITE_NAME' migrate
-    bench --site '$SITE_NAME' set-admin-password '$ADMIN_PASSWORD'
-    bench --site '$SITE_NAME' install-app lms
+    echo "--- [frappe] First-time setup complete. ---"
 else
-    echo '--- [frappe] Database is already installed. Running migrations... ---'
-    bench --site '$SITE_NAME' migrate
+    echo "--- [frappe] Site '$SITE_NAME' found. Running migrations... ---"
+    # For subsequent starts, just run migrations.
+    bench --site "$SITE_NAME" migrate
 fi
 
-echo '--- [frappe] Starting Frappe server... ---'
-bench start
-" 
+echo "--- [frappe] Starting Frappe server... ---"
+bench start 
