@@ -54,14 +54,12 @@ echo "---"
 # Check if the site is installed by checking its status.
 if ! bench --site "$SITE_NAME" status > /dev/null 2>&1; then
     echo "--- [frappe] Database not installed. Running first-time setup... ---"
-    # Use the standard migrate command. This creates the schema and runs app migrations.
-    bench --site "$SITE_NAME" migrate
+    python /usr/local/bin/run_migrate.py "$SITE_NAME"
     bench --site "$SITE_NAME" set-admin-password "$ADMIN_PASSWORD"
     bench --site "$SITE_NAME" install-app lms
 else
     echo "--- [frappe] Database is already installed. Running migrations... ---"
-    # For subsequent deploys, just run migrate.
-    bench --site "$SITE_NAME" migrate
+    python /usr/local/bin/run_migrate.py "$SITE_NAME"
 fi
 
 echo "--- [frappe] Starting Frappe server... ---"

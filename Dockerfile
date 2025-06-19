@@ -13,6 +13,8 @@ RUN apt-get update && \
 # Copy scripts to a standard executable path and make them executable
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
+COPY run_migrate.py /usr/local/bin/run_migrate.py
+RUN chmod +x /usr/local/bin/run_migrate.py
 
 USER frappe
 
