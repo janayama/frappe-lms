@@ -39,19 +39,19 @@ EOF
 # STEP 4: Register the site in sites.txt so the bench knows about it.
 echo "$SITE_NAME" > sites/sites.txt
 
-# STEP 5: Check if the site is installed using a direct Python command.
+# STEP 5: Check if the site is installed using the bench's python virtual environment.
 IS_INSTALLED_SCRIPT="import frappe, os; frappe.init(os.environ.get('SITE_NAME')); frappe.connect(); print('1' if frappe.db.table_exists('User') else '0'); frappe.db.close()"
-INSTALLED=$(python3 -c "$IS_INSTALLED_SCRIPT")
+INSTALLED=$(./env/bin/python -c "$IS_INSTALLED_SCRIPT")
 
 # STEP 6: Run first-time installation or updates.
 if [ "$INSTALLED" = "0" ]; then
     echo "Database for $SITE_NAME appears to be empty. Running first-time installation..."
-    python3 /usr/local/bin/run_migrate.py
+    ./env/bin/python /usr/local/bin/run_migrate.py
     bench --site "$SITE_NAME" set-admin-password "$ADMIN_PASSWORD"
     bench --site "$SITE_NAME" install-app lms
 else
     echo "Database for $SITE_NAME is already installed. Running migrations for updates."
-    python3 /usr/local/bin/run_migrate.py
+    ./env/bin/python /usr/local/bin/run_migrate.py
 fi
 
 echo "Starting Frappe server..."
