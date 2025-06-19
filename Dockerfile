@@ -11,10 +11,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Create a non-root user 'frappe'
-RUN useradd -m -s /bin/bash frappe
-
-# Copy scripts to a standard executable path and make them executable
+# Copy and prepare entrypoint script
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
