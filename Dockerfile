@@ -14,6 +14,9 @@ RUN apt-get update && \
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
+# Copy the migration script
+COPY run_migrate.py /home/frappe/frappe-bench/run_migrate.py
+
 USER frappe
 
 # Set the working directory to the user's home
