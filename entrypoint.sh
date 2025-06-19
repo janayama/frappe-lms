@@ -35,7 +35,7 @@ cat <<EOF > "sites/$SITE_NAME/site_config.json"
     "db_name": "$MARIADB_DATABASE",
     "db_password": "$MARIADB_PASSWORD",
     "db_port": $MARIADB_PORT,
-    "db_user": "$USER"
+    "db_user": "$MARIADB_USER"
 }
 EOF
 
