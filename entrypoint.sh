@@ -31,15 +31,14 @@ EOF
 echo "$SITE_NAME" > sites/sites.txt
 
 # STEP 3: Check if the site is installed by looking for a core Frappe table.
-# The '|| echo ""' prevents the script from exiting if the grep fails.
-# This is a reliable way to check for first-time setup vs. an update.
-INSTALLED=$(bench --site "$SITE_NAME" mysql --execute "SHOW TABLES LIKE 'tabDocType';" | grep 'tabDocType' || echo "")
+# This uses the 'mariadb' command, which is correct for this environment.
+INSTALLED=$(echo "SHOW TABLES LIKE 'tabDocType';" | bench --site "$SITE_NAME" mariadb | grep 'tabDocType' || echo "")
 
 # STEP 4: Run first-time installation or updates.
 if [ -z "$INSTALLED" ]; then
     echo "Database for $SITE_NAME appears to be empty. Running first-time installation..."
     # A. Run migrate. On an empty DB, this creates the entire schema.
-    bench --site "$SITE_NAME" migrate --no-backup
+    bench --site "$SITE_NAME" migrate
     # B. Set the admin password non-interactively.
     bench --site "$SITE_NAME" set-admin-password "$ADMIN_PASSWORD"
     # C. Install the 'lms' app, which runs its own migrations.
@@ -47,7 +46,7 @@ if [ -z "$INSTALLED" ]; then
 else
     echo "Database for $SITE_NAME is already installed. Running migrations for updates."
     # On subsequent deploys, just run migrate to apply any new changes.
-    bench --site "$SITE_NAME" migrate --no-backup
+    bench --site "$SITE_NAME" migrate
 fi
 
 echo "Starting Frappe server..."
