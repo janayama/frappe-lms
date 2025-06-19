@@ -8,42 +8,48 @@ set -e
 cd /home/frappe/frappe-bench
 
 # Set the site name from the SITE_NAME environment variable provided by Railway
-# or default to a generic name if not set.
 SITE_NAME=${SITE_NAME:-"lms.localhost"}
 
-# Configure bench to use the Railway environment variables for database and Redis connections.
-bench set-mariadb-host "$MARIADB_HOST"
-bench set-redis-cache-host "redis://$REDIS_HOST:$REDIS_PORT"
-bench set-redis-queue-host "redis://$REDIS_HOST:$REDIS_PORT"
-bench set-redis-socketio-host "redis://$REDIS_HOST:$REDIS_PORT"
+# Configure bench to use the Railway environment variables for Redis.
+# The REDIS_URL variable contains all connection info, including the password.
+bench set-redis-cache-host "$REDIS_URL"
+bench set-redis-queue-host "$REDIS_URL"
+bench set-redis-socketio-host "$REDIS_URL"
 
-# Check if the site already exists.
-if [ -d "sites/$SITE_NAME" ]; then
-    echo "Site $SITE_NAME already exists. Skipping creation."
-else
-    echo "Site $SITE_NAME does not exist. Creating..."
-    # Create a new site using the environment variables.
-    # --no-mariadb-socket is important for connecting to a remote database.
-    bench new-site "$SITE_NAME" \
-        --db-name "$MARIADB_DATABASE" \
-        --db-password "$MARIADB_PASSWORD" \
-        --db-host "$MARIADB_HOST" \
-        --db-port "$MARIADB_PORT" \
-        --mariadb-root-username "$MARIADB_USER" \
-        --mariadb-root-password "$MARIADB_PASSWORD" \
-        --admin-password "$ADMIN_PASSWORD" \
-        --no-mariadb-socket \
-        --force
-    
-    # Install the 'lms' app on the newly created site.
+# Check if the site directory exists. If not, this is the first deployment.
+if [ ! -d "sites/$SITE_NAME" ]; then
+    echo "Site $SITE_NAME does not exist. Creating and installing for the first time..."
+
+    # 1. Manually create the site directory and the site_config.json file.
+    # This is the key to bypassing the 'new-site' command's user creation,
+    # which fails on managed databases.
+    mkdir -p sites/$SITE_NAME
+    cat <<EOF > sites/$SITE_NAME/site_config.json
+{
+    "db_host": "$MARIADB_HOST",
+    "db_name": "$MARIADB_DATABASE",
+    "db_password": "$MARIADB_PASSWORD",
+    "db_port": $MARIADB_PORT,
+    "db_user": "$MARIADB_USER",
+    "developer_mode": 1
+}
+EOF
+    # 2. Add the site to the list of sites for the bench.
+    echo "$SITE_NAME" > sites/common_site_config.json
+
+    # 3. Use 'reinstall' to populate the database.
+    # This creates all the base Frappe tables and the Administrator user
+    # using the credentials we just provided in site_config.json.
+    bench --site "$SITE_NAME" reinstall --yes --admin-password "$ADMIN_PASSWORD"
+
+    # 4. Install the 'lms' app on the newly created site.
     bench --site "$SITE_NAME" install-app lms
+else
+    echo "Site $SITE_NAME already exists. Skipping first-time installation."
 fi
 
-# Set the developer_mode to 1 to allow for easier debugging if needed.
-bench --site "$SITE_NAME" set-config developer_mode 1
-
-# Run database migrations to ensure the schema is up to date.
+# Run database migrations to ensure the schema is up to date on every deploy.
 bench --site "$SITE_NAME" migrate
 
-# Start the Frappe server. This is the main process that will keep the container running.
+# Start the Frappe server.
 bench start 
