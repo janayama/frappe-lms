@@ -1,28 +1,47 @@
-FROM frappe/bench:latest
+FROM frappe/bench:latest as frappe-lms-app
 
-# Switch to root to install system dependencies
+# Frappe's bench image is based on Debian. We need to install NodeJS and Yarn.
 USER root
-
-# Install redis-server for caching. Gunicorn is already included in the base image.
-RUN apt-get update && apt-get install -y redis-server --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
-
-# Switch back to frappe user
+RUN apt-get update && \
+    apt-get install -y curl && \
+    curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    npm install -g yarn && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 USER frappe
 
-# Set working directory
+# Set the working directory to the user's home
 WORKDIR /home/frappe
 
-# Copy the initialization script
-COPY --chown=frappe:frappe init-railway.sh ./
-RUN chmod +x ./init-railway.sh
+# Initialize a new bench. This creates the directory structure and installs Frappe framework.
+# We skip redis config generation because we will provide it via environment variables.
+RUN bench init --skip-redis-config-generation frappe-bench
 
-# Expose the port Frappe will run on
+# Set the working directory to the newly created bench
+WORKDIR /home/frappe/frappe-bench
+
+# Copy your local app code into a temporary directory inside the container
+COPY --chown=frappe:frappe . /app_source
+
+# Move the 'lms' python app and its 'frontend' code into the bench's apps directory.
+# This makes your app available to the bench.
+RUN mv /app_source/lms ./apps/
+RUN mv /app_source/frontend ./apps/lms/frontend
+RUN mv /app_source/pyproject.toml ./apps/lms/
+
+# Install the LMS app's Python dependencies from its pyproject.toml
+RUN bench setup requirements --python && \
+    pip install -e ./apps/lms
+
+# Install the LMS app's Node.js dependencies and build the frontend assets.
+# `bench build` is the standard Frappe command to compile and place assets correctly.
+RUN bench setup requirements --node && \
+    bench build --app lms
+
+# Expose the port Frappe runs on
 EXPOSE 8000
 
-# Health check will point to Gunicorn. Increased start-period for first setup.
-HEALTHCHECK --interval=30s --timeout=10s --start-period=600s --retries=5 \
-    CMD curl -f http://localhost:8000/api/method/ping || exit 1
-
-# Run the initialization script which will end by executing gunicorn
-CMD ["./init-railway.sh"] 
+# Set the entrypoint to our custom script
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["-"] 
