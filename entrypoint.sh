@@ -1,58 +1,67 @@
 #!/bin/bash
 set -e
 
-# This is the CRITICAL FIX:
-# Explicitly set the PATH to prioritize the virtual environment's executables.
-# This ensures we use the correct `bench` and `python` commands throughout the script.
-export PATH="/home/frappe/frappe-bench/env/bin:$PATH"
-
-# From this point on, all `bench` and `python` commands will use the correct environment.
-
+# This script runs as ROOT.
 cd /home/frappe/frappe-bench
+
+# Export these variables so the `su` sub-shell can see them.
 export SITE_NAME=${SITE_NAME:-"lms.localhost"}
+export ADMIN_PASSWORD=${ADMIN_PASSWORD}
 
-# STEP 1: Check if the site directory already exists.
-# If it does, we assume it's already installed and just run migrations.
-if [ -d "sites/$SITE_NAME" ]; then
-    echo "--- [frappe] Site directory already exists. Running migrations... ---"
-    bench --site "$SITE_NAME" migrate
-    echo "--- [frappe] Starting Frappe server... ---"
-    bench start
-    exit 0
-fi
-
-# STEP 2: If the site does NOT exist, run the full first-time setup.
-echo "--- [frappe] Site directory does not exist. Running first-time setup... ---"
-
-# A. Use our `expect` script to run `bench new-site` non-interactively.
-# This creates the site with a dummy local DB, but correctly sets up the filesystem.
-/usr/local/bin/setup_site.exp "$SITE_NAME"
-
-# B. IMMEDIATELY overwrite the dummy config with the real Railway DB and Redis config.
-echo "--- [frappe] Overwriting dummy config with Railway config... ---"
-cat <<EOF > "sites/$SITE_NAME/site_config.json"
+# STEP 1: Manually create all config files and directories as root.
+echo "--- [ROOT] Creating configuration files... ---"
+cat <<EOF > sites/common_site_config.json
 {
-    "db_name": "$MARIADB_DATABASE",
-    "db_password": "$MARIADB_PASSWORD",
-    "db_port": $MARIADB_PORT,
-    "db_user": "$MARIADB_USER",
-    "db_type": "mariadb",
+    "db_host": "$MARIADB_HOST",
     "redis_cache": "$REDIS_URL",
     "redis_queue": "$REDIS_URL",
     "redis_socketio": "$REDIS_URL"
 }
 EOF
 
-# C. Set the default site, which is also required.
-bench config set-common-config -c default_site "$SITE_NAME"
+mkdir -p "sites/$SITE_NAME/logs"
+touch "sites/$SITE_NAME/logs/database.log"
+touch "sites/$SITE_NAME/logs/frappe.log"
 
-# D. Now, run migrate. This will populate the REAL Railway database.
-echo "--- [frappe] Populating the real database... ---"
-bench --site "$SITE_NAME" migrate
+cat <<EOF > "sites/$SITE_NAME/site_config.json"
+{
+    "db_name": "$MARIADB_DATABASE",
+    "db_password": "$MARIADB_PASSWORD",
+    "db_port": $MARIADB_PORT,
+    "db_user": "$MARIADB_USER",
+    "db_type": "mariadb"
+}
+EOF
 
-# E. Set the admin password and install the lms app.
-bench --site "$SITE_NAME" set-admin-password "$ADMIN_PASSWORD"
-bench --site "$SITE_NAME" install-app lms
+echo "$SITE_NAME" > sites/sites.txt
 
-echo "--- [frappe] First-time setup complete. Starting Frappe server... ---"
-bench start 
+# STEP 2: Fix all permissions BEFORE switching user.
+chown -R frappe:frappe /home/frappe/frappe-bench/sites
+
+echo "--- [ROOT] Configuration complete. Switching to user 'frappe'... ---"
+
+# STEP 3: Switch to the 'frappe' user and execute the rest of the logic.
+# The `-c` flag runs the provided command string in a new shell.
+# We activate the virtualenv and then run the standard bench commands.
+su -m frappe -c "
+set -e
+cd /home/frappe/frappe-bench
+source env/bin/activate
+
+echo '--- [frappe] Bench environment activated. ---'
+
+bench use '$SITE_NAME'
+
+if ! bench --site '$SITE_NAME' status > /dev/null 2>&1; then
+    echo '--- [frappe] Database not installed. Running first-time setup... ---'
+    bench --site '$SITE_NAME' migrate
+    bench --site '$SITE_NAME' set-admin-password '$ADMIN_PASSWORD'
+    bench --site '$SITE_NAME' install-app lms
+else
+    echo '--- [frappe] Database is already installed. Running migrations... ---'
+    bench --site '$SITE_NAME' migrate
+fi
+
+echo '--- [frappe] Starting Frappe server... ---'
+bench start
+" 
