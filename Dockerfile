@@ -49,9 +49,9 @@ RUN bench setup requirements --node
 # Build the frontend assets
 RUN PYTHONPATH=$(pwd)/apps:$PYTHONPATH bench build --app lms
 
-# Expose the port Frappe runs on
+# Final setup for the container
 EXPOSE 8000
-
-# Set the entrypoint to our custom script
+# Run the entrypoint as root to have permission to create site configs.
+USER root
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["-"] 

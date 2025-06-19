@@ -1,21 +1,20 @@
 #!/bin/bash
 set -e
 
-# This script is the entrypoint for the Docker container.
-# It sets up the Frappe environment based on Railway's environment variables.
+# This script runs as ROOT.
 
-# Navigate to the bench directory
+# Since we are root, we need to cd to the correct directory.
 cd /home/frappe/frappe-bench
 
 # Set a shell variable for the site name.
-SITE_NAME=${SITE_NAME:-"lms.localhost"}
+# It's crucial to export this so the `su-exec` sub-shell can see it.
+export SITE_NAME=${SITE_NAME:-"lms.localhost"}
+export ADMIN_PASSWORD=${ADMIN_PASSWORD}
 
-# --- DIAGNOSTICS: Print current state ---
-echo "--- Preparing to configure site: $SITE_NAME ---"
-echo "Current working directory: $(pwd)"
+echo "--- Running as user: $(whoami) ---"
+echo "--- Configuring site: $SITE_NAME ---"
 
-# STEP 1: Manually create all config files and directories.
-# The "default_site" key is the critical fix for the IncorrectSitePath error.
+# STEP 1: Manually create all config files and directories as root.
 cat <<EOF > sites/common_site_config.json
 {
     "db_host": "$MARIADB_HOST",
@@ -39,49 +38,39 @@ cat <<EOF > "sites/$SITE_NAME/site_config.json"
 }
 EOF
 
-# STEP 2: Register the site in sites.txt so the bench knows about it.
 echo "$SITE_NAME" > sites/sites.txt
-# This is the final, critical step. The currentsite.txt file explicitly
-# tells the framework which site is active, resolving the IncorrectSitePath error.
 echo "$SITE_NAME" > sites/currentsite.txt
 
-# --- DIAGNOSTICS: Print file system state after creation ---
-echo "--- Configuration files created. Verifying contents... ---"
-echo "Listing sites directory contents:"
-ls -laR sites
-echo "---"
-echo "Contents of sites.txt:"
-cat sites/sites.txt
-echo "---"
-echo "Contents of common_site_config.json:"
-cat sites/common_site_config.json
-echo "---"
-echo "Contents of currentsite.txt:"
-cat sites/currentsite.txt
-echo "---"
-echo "Contents of $SITE_NAME/site_config.json:"
-cat "sites/$SITE_NAME/site_config.json"
-echo "---"
+# STEP 2: Fix all permissions.
+# Give ownership of all created files to the 'frappe' user.
+chown -R frappe:frappe /home/frappe/frappe-bench/sites
 
-# STEP 3: Check if the site is installed using a direct Python command.
-echo "--- Checking if database is installed... ---"
+echo "--- Configuration complete. Site directory contents: ---"
+ls -laR sites
+echo "--- Switching to user 'frappe' to run application... ---"
+
+# STEP 3: Switch to the 'frappe' user and execute the rest of the logic.
+# `su-exec` is a lightweight tool to run a command as a different user.
+# We pass a new script block to it.
+su-exec frappe:frappe bash <<'EOF'
+set -e
+cd /home/frappe/frappe-bench
+
+# STEP 3a: Check if the site is installed using a direct Python command.
 IS_INSTALLED_SCRIPT="import frappe; frappe.init('$SITE_NAME'); frappe.connect(); print('1' if frappe.db.table_exists('User') else '0'); frappe.db.close()"
 INSTALLED=$(./env/bin/python -c "$IS_INSTALLED_SCRIPT")
 
-# STEP 4: Run first-time installation or updates.
+# STEP 3b: Run first-time installation or updates.
 if [ "$INSTALLED" = "0" ]; then
-    echo "--- Database is empty. Running first-time installation... ---"
-    # A. Run migrate, passing the site name as an argument.
+    echo "--- (as frappe) Database is empty. Running first-time installation... ---"
     ./env/bin/python /usr/local/bin/run_migrate.py "$SITE_NAME"
-    # B. Set the admin password.
     bench --site "$SITE_NAME" set-admin-password "$ADMIN_PASSWORD"
-    # C. Install the 'lms' app.
     bench --site "$SITE_NAME" install-app lms
 else
-    echo "--- Database is already installed. Running migrations... ---"
-    # On subsequent deploys, run migrate, passing the site name as an argument.
+    echo "--- (as frappe) Database is already installed. Running migrations... ---"
     ./env/bin/python /usr/local/bin/run_migrate.py "$SITE_NAME"
 fi
 
-echo "--- Starting Frappe server... ---"
-bench start 
+echo "--- (as frappe) Starting Frappe server... ---"
+bench start
+EOF 
