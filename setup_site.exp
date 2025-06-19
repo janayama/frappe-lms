@@ -10,11 +10,16 @@ set site [lindex $argv 0]
 # Start the `bench new-site` command.
 spawn bench new-site $site
 
-# Expect the prompt for "MySQL root password".
+# Expect the prompt for the super user. The `*` is a glob pattern.
+expect "Enter mysql super user*:"
+
+# Send a newline character (\r) to accept the default 'root' user.
+send "\r"
+
+# Expect the prompt for the password.
 expect "MySQL root password: "
 
-# Send a dummy password. The password itself doesn't matter
-# as we will overwrite the config file immediately after.
+# Send a dummy password.
 send "dummy_password\r"
 
 # Wait for the command to complete.
