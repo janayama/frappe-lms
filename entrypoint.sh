@@ -7,7 +7,7 @@ set -e
 cd /home/frappe/frappe-bench
 
 # Set a shell variable for the site name.
-# It's crucial to export this so the `su-exec` sub-shell can see it.
+# It's crucial to export this so the `su` sub-shell can see it.
 export SITE_NAME=${SITE_NAME:-"lms.localhost"}
 export ADMIN_PASSWORD=${ADMIN_PASSWORD}
 
@@ -50,17 +50,17 @@ ls -laR sites
 echo "--- Switching to user 'frappe' to run application... ---"
 
 # STEP 3: Switch to the 'frappe' user and execute the rest of the logic.
-# `su-exec` is a lightweight tool to run a command as a different user.
-# We pass a new script block to it.
-su-exec frappe:frappe bash <<'EOF'
+# We use `su` with a "here document" to pass the script block.
+# The `-m` flag preserves the environment variables we exported.
+su -m frappe <<'EOF'
 set -e
 cd /home/frappe/frappe-bench
 
-# STEP 3a: Check if the site is installed using a direct Python command.
+# Check if the site is installed
 IS_INSTALLED_SCRIPT="import frappe; frappe.init('$SITE_NAME'); frappe.connect(); print('1' if frappe.db.table_exists('User') else '0'); frappe.db.close()"
 INSTALLED=$(./env/bin/python -c "$IS_INSTALLED_SCRIPT")
 
-# STEP 3b: Run first-time installation or updates.
+# Run first-time installation or updates
 if [ "$INSTALLED" = "0" ]; then
     echo "--- (as frappe) Database is empty. Running first-time installation... ---"
     ./env/bin/python /usr/local/bin/run_migrate.py "$SITE_NAME"
