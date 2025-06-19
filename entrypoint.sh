@@ -10,17 +10,10 @@ cd /home/frappe/frappe-bench
 # Set the site name from the SITE_NAME environment variable provided by Railway
 SITE_NAME=${SITE_NAME:-"lms.localhost"}
 
-# Check if the site directory exists. If not, this is the first deployment.
-if [ ! -f "sites/$SITE_NAME/site_config.json" ]; then
-    echo "Site $SITE_NAME does not exist. Creating and installing for the first time..."
-
-    # 1. Register the site in sites.txt
-    echo "$SITE_NAME" > sites/sites.txt
-
-    # 2. Manually create the site directory and a single, comprehensive site_config.json file.
-    # This is the key to bypassing the 'new-site' command's permission issues and centralizes all config.
-    mkdir -p sites/$SITE_NAME
-    cat <<EOF > sites/$SITE_NAME/site_config.json
+# STEP 1: Always create the site's configuration.
+# This ensures a fresh, correct config on every deploy, pointing to the Railway services.
+mkdir -p sites/$SITE_NAME
+cat <<EOF > sites/$SITE_NAME/site_config.json
 {
     "db_host": "$MARIADB_HOST",
     "db_name": "$MARIADB_DATABASE",
@@ -34,19 +27,28 @@ if [ ! -f "sites/$SITE_NAME/site_config.json" ]; then
 }
 EOF
 
-    # 3. Use 'reinstall' to populate the database.
-    # This creates all the base Frappe tables and the Administrator user
-    # using the credentials we just provided in site_config.json.
-    bench --site "$SITE_NAME" reinstall --yes --admin-password "$ADMIN_PASSWORD"
+# STEP 2: Register the site in sites.txt so the bench knows about it.
+echo "$SITE_NAME" > sites/sites.txt
 
-    # 4. Install the 'lms' app on the newly created site.
+# STEP 3: Check if the site is installed by looking for a core Frappe table.
+# The '|| echo ""' prevents the script from exiting if the grep fails.
+# This is a reliable way to check for first-time setup vs. an update.
+INSTALLED=$(bench --site "$SITE_NAME" mysql --execute "SHOW TABLES LIKE 'tabDocType';" | grep 'tabDocType' || echo "")
+
+# STEP 4: Run first-time installation or updates.
+if [ -z "$INSTALLED" ]; then
+    echo "Database for $SITE_NAME appears to be empty. Running first-time installation..."
+    # A. Run migrate. On an empty DB, this creates the entire schema.
+    bench --site "$SITE_NAME" migrate --no-backup
+    # B. Set the admin password non-interactively.
+    bench --site "$SITE_NAME" set-admin-password "$ADMIN_PASSWORD"
+    # C. Install the 'lms' app, which runs its own migrations.
     bench --site "$SITE_NAME" install-app lms
 else
-    echo "Site $SITE_NAME already exists. Skipping first-time installation."
+    echo "Database for $SITE_NAME is already installed. Running migrations for updates."
+    # On subsequent deploys, just run migrate to apply any new changes.
+    bench --site "$SITE_NAME" migrate --no-backup
 fi
 
-# Run database migrations to ensure the schema is up to date on every deploy.
-bench --site "$SITE_NAME" migrate
-
-# Start the Frappe server.
+echo "Starting Frappe server..."
 bench start 
