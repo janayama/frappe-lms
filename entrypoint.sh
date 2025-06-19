@@ -7,8 +7,9 @@ set -e
 # Navigate to the bench directory
 cd /home/frappe/frappe-bench
 
-# Set the site name from the SITE_NAME environment variable provided by Railway
-SITE_NAME=${SITE_NAME:-"lms.localhost"}
+# EXPORT is the crucial keyword that makes the SITE_NAME variable available
+# to all child processes, including the Python scripts below.
+export SITE_NAME=${SITE_NAME:-"lms.localhost"}
 
 # STEP 1: Manually create the global config file.
 # This bypasses the unreliable `bench config` subcommands entirely.
