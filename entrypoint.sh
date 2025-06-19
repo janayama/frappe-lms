@@ -11,8 +11,7 @@ cd /home/frappe/frappe-bench
 export SITE_NAME=${SITE_NAME:-"lms.localhost"}
 export ADMIN_PASSWORD=${ADMIN_PASSWORD}
 
-echo "--- Running as user: $(whoami) ---"
-echo "--- Configuring site: $SITE_NAME ---"
+echo "--- [ROOT] Configuring site: $SITE_NAME ---"
 
 # STEP 1: Manually create all config files and directories as root.
 cat <<EOF > sites/common_site_config.json
@@ -41,13 +40,23 @@ EOF
 echo "$SITE_NAME" > sites/sites.txt
 echo "$SITE_NAME" > sites/currentsite.txt
 
+# This is a critical step to ensure the bench context is set.
+bench use "$SITE_NAME"
+
 # STEP 2: Fix all permissions.
 # Give ownership of all created files to the 'frappe' user.
 chown -R frappe:frappe /home/frappe/frappe-bench/sites
 
-echo "--- Configuration complete. Site directory contents: ---"
+# --- DIAGNOSTICS AS ROOT ---
+echo "--- [ROOT] Configuration complete. Verifying filesystem... ---"
 ls -laR sites
-echo "--- Switching to user 'frappe' to run application... ---"
+echo "--- [ROOT] common_site_config.json ---"
+cat sites/common_site_config.json
+echo "--- [ROOT] currentsite.txt ---"
+cat sites/currentsite.txt
+echo "--- [ROOT] Verifying permissions from frappe user's perspective... ---"
+su frappe -c "ls -laR /home/frappe/frappe-bench/sites"
+echo "--- [ROOT] Switching to user 'frappe' to run application... ---"
 
 # STEP 3: Switch to the 'frappe' user and execute the rest of the logic.
 # We use `su` with a "here document" to pass the script block.
@@ -56,21 +65,21 @@ su -m frappe <<'EOF'
 set -e
 cd /home/frappe/frappe-bench
 
-# Check if the site is installed
-IS_INSTALLED_SCRIPT="import frappe; frappe.init('$SITE_NAME'); frappe.connect(); print('1' if frappe.db.table_exists('User') else '0'); frappe.db.close()"
-INSTALLED=$(./env/bin/python -c "$IS_INSTALLED_SCRIPT")
-
-# Run first-time installation or updates
-if [ "$INSTALLED" = "0" ]; then
-    echo "--- (as frappe) Database is empty. Running first-time installation... ---"
+# Check if the site is installed by checking its status.
+# A failure here means the DB is not set up yet.
+if ! bench --site "$SITE_NAME" status > /dev/null 2>&1; then
+    echo "--- [frappe] Database not installed. Running first-time setup... ---"
+    # A. Run migrate using our robust python script.
     ./env/bin/python /usr/local/bin/run_migrate.py "$SITE_NAME"
+    # B. Set the admin password.
     bench --site "$SITE_NAME" set-admin-password "$ADMIN_PASSWORD"
+    # C. Install the 'lms' app.
     bench --site "$SITE_NAME" install-app lms
 else
-    echo "--- (as frappe) Database is already installed. Running migrations... ---"
+    echo "--- [frappe] Database is already installed. Running migrations... ---"
     ./env/bin/python /usr/local/bin/run_migrate.py "$SITE_NAME"
 fi
 
-echo "--- (as frappe) Starting Frappe server... ---"
+echo "--- [frappe] Starting Frappe server... ---"
 bench start
 EOF 
