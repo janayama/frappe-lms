@@ -28,10 +28,9 @@ echo "--- [Frappe Entrypoint] Initializing for site: $SITE_NAME ---"
 # The Dockerfile sets the working directory to /home/frappe/frappe-bench
 cd /home/frappe/frappe-bench
 
-# --- Step 1: Configure Bench ---
-# Create the common configuration file used by all sites managed by this bench.
-# This file tells Frappe how to connect to the database and Redis.
-echo "--- [Frappe Entrypoint] Writing common_site_config.json ---"
+# --- Step 1: Write Config Files ---
+echo "--- [Frappe Entrypoint] Writing configuration files... ---"
+# Write common_site_config.json
 cat <<EOF > sites/common_site_config.json
 {
     "db_host": "$MARIADB_HOST",
@@ -41,12 +40,7 @@ cat <<EOF > sites/common_site_config.json
     "redis_socketio": "$REDIS_URL"
 }
 EOF
-echo "Common configuration written successfully."
-
-# In addition to the common config, we must create the site-specific
-# config file *before* calling `new-site`.
-echo "--- [Frappe Entrypoint] Writing site_config.json for $SITE_NAME ---"
-# Create site-specific directory
+# Write site_config.json for the site
 mkdir -p "sites/$SITE_NAME"
 cat <<EOF > "sites/$SITE_NAME/site_config.json"
 {
@@ -55,32 +49,30 @@ cat <<EOF > "sites/$SITE_NAME/site_config.json"
     "db_user": "$MARIADB_USER"
 }
 EOF
-echo "Site-specific configuration written successfully."
+echo "Configuration files written successfully."
 
-# --- Step 2: Create and Install Site ---
-# This is the final and correct way to create the site. We tell bench
-# that the 'root' user for this operation is the one provided by our environment.
-# This prevents bench from trying to connect as the literal 'root' user.
-echo "--- [Frappe Entrypoint] Creating site '$SITE_NAME' using environment credentials... ---"
-bench new-site "$SITE_NAME" \
-  --db-root-username "$MARIADB_USER" \
-  --db-root-password "$MARIADB_PASSWORD" \
-  --admin-password "$ADMIN_PASSWORD" \
-  --install-app lms \
-  --force
-echo "Site creation command executed."
+# --- Step 2: Manually "Install" Site ---
+# We bypass `new-site` which requires `CREATE USER` privileges.
+# We create a dummy installed.json and then let `migrate` create the schema.
+echo "--- [Frappe Entrypoint] Bypassing new-site; preparing for manual migration... ---"
+if [ ! -f "sites/$SITE_NAME/installed.json" ]; then
+    echo '["frappe", "lms"]' > "sites/$SITE_NAME/installed.json"
+    echo "Created dummy installed.json to trick bench."
+fi
 
 # --- Step 3: Run Database Migrations ---
-# After the site is created, we must run migrations to ensure the database
-# schema is up-to-date with the latest version of the installed apps.
+# This command connects to the DB, sees no tables, and creates them.
 echo "--- [Frappe Entrypoint] Running database migrations... ---"
 bench --site "$SITE_NAME" migrate
 echo "Migrations completed."
 
-# --- Step 4: Start the Application ---
-# The `bench start` command reads the `Procfile` and starts all necessary
-# processes, including the web server, scheduler, and background workers.
-# While not a true production-grade process manager, it's the standard
-# way to run Frappe and is suitable for getting started on Railway.
+# --- Step 4: Set Admin Password ---
+# Set the admin password for the newly installed site.
+echo "--- [Frappe Entrypoint] Setting admin password... ---"
+bench --site "$SITE_NAME" set-admin-password "$ADMIN_PASSWORD" --logout-all-sessions
+echo "Admin password set."
+
+# --- Step 5: Start Application ---
+# Start the Frappe processes using the Procfile.
 echo "--- [Frappe Entrypoint] Starting Frappe processes via 'bench start'... ---"
 bench start 
