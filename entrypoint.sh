@@ -23,6 +23,9 @@ if [ ! -d "sites/$SITE_NAME" ]; then
 }
 EOF
 
+    # Create the site directory BEFORE writing the site-specific config.
+    mkdir -p "sites/$SITE_NAME"
+
     cat <<EOF > "sites/$SITE_NAME/site_config.json"
 {
     "db_name": "$MARIADB_DATABASE",
@@ -33,7 +36,8 @@ EOF
 
     # 2. Use `bench reinstall` for a robust, idempotent setup.
     # It creates the DB schema and sets the admin password.
-    bench --site "$SITE_NAME" reinstall --yes --admin-password "$ADMIN_PASSWORD"
+    # --skip-service-check is CRITICAL for containerized environments.
+    bench --site "$SITE_NAME" reinstall --yes --admin-password "$ADMIN_PASSWORD" --skip-service-check
     bench --site "$SITE_NAME" install-app lms
     # Set the default site for future bench commands.
     bench use "$SITE_NAME"
@@ -42,7 +46,8 @@ EOF
 else
     echo "--- [frappe] Site '$SITE_NAME' found. Running migrations... ---"
     # For subsequent starts, just run migrations.
-    bench --site "$SITE_NAME" migrate
+    # --skip-service-check is CRITICAL for containerized environments.
+    bench --site "$SITE_NAME" migrate --skip-service-check
 fi
 
 echo "--- [frappe] Starting Frappe server... ---"
