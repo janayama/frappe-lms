@@ -46,8 +46,9 @@ EOF
 else
     echo "--- [frappe] Site '$SITE_NAME' found. Running migrations... ---"
     # For subsequent starts, just run migrations.
-    # --skip-service-check is CRITICAL for containerized environments.
-    bench --site "$SITE_NAME" migrate --skip-service-check
+    # Use `bench execute` to call the migration function directly,
+    # bypassing the faulty service check in the `migrate` command.
+    bench --site "$SITE_NAME" execute frappe.migrate.run_all
 fi
 
 echo "--- [frappe] Starting Frappe server... ---"
