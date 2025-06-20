@@ -51,14 +51,6 @@ bench --site "$SITE_NAME" set-config db_user "$MARIADB_USER"
 echo "Configuration set successfully."
 
 bench --site "$SITE_NAME" show-config -f json
-# --- Step 2: Manually "Install" Site ---
-# We bypass `new-site` which requires `CREATE USER` privileges.
-# We create a dummy installed.json and then let `migrate` create the schema.
-echo "--- [Frappe Entrypoint] Bypassing new-site; preparing for manual migration... ---"
-if [ ! -f "sites/$SITE_NAME/installed.json" ]; then
-    echo '["frappe", "lms"]' > "sites/$SITE_NAME/installed.json"
-    echo "Created dummy installed.json to trick bench."
-fi
 
 # --- Step 3: Run Database Migrations ---
 # Use the standard bench migrate command with skip-failing flag for robustness
