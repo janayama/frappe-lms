@@ -31,11 +31,11 @@ cd /home/frappe/frappe-bench
 # --- Step 1: Set Configuration ---
 echo "--- [Frappe Entrypoint] Setting site configuration... ---"
 # Set common configuration using bench set-config
-bench set-config db_host "$MARIADB_HOST"
-bench set-config db_port "$MARIADB_PORT"
-bench set-config redis_cache "$REDIS_URL"
-bench set-config redis_queue "$REDIS_URL"
-bench set-config redis_socketio "$REDIS_URL"
+bench --site "$SITE_NAME" set-config db_host "$MARIADB_HOST"
+bench --site "$SITE_NAME" set-config db_port "$MARIADB_PORT"
+bench --site "$SITE_NAME" set-config redis_cache "$REDIS_URL"
+bench --site "$SITE_NAME" set-config redis_queue "$REDIS_URL"
+bench --site "$SITE_NAME" set-config redis_socketio "$REDIS_URL"
 
 # Create site directory and set site-specific configuration
 mkdir -p "sites/$SITE_NAME/logs"
@@ -44,7 +44,7 @@ bench --site "$SITE_NAME" set-config db_password "$MARIADB_PASSWORD"
 bench --site "$SITE_NAME" set-config db_user "$MARIADB_USER"
 echo "Configuration set successfully."
 
-bench --site all show-config -f json
+bench --site "$SITE_NAME" show-config -f json
 # --- Step 2: Manually "Install" Site ---
 # We bypass `new-site` which requires `CREATE USER` privileges.
 # We create a dummy installed.json and then let `migrate` create the schema.
