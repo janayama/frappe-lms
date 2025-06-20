@@ -57,7 +57,7 @@ if [ "$MARIADB_USER" != "$MARIADB_DATABASE" ]; then
     bench --site "$SITE_NAME" set-config db_user "$MARIADB_USER"
 fi
 
--bench --site "$SITE_NAME" show-config -f json
+bench --site "$SITE_NAME" show-config -f json
 
 echo "Configuration set successfully."
 
