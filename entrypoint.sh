@@ -34,7 +34,7 @@ echo "--- [Frappe Entrypoint] Writing configuration files... ---"
 cat <<EOF > sites/common_site_config.json
 {
     "db_host": "$MARIADB_HOST",
-    "db_port": $MARIADB_PORT,
+    "db_port": "$MARIADB_PORT",
     "redis_cache": "$REDIS_URL",
     "redis_queue": "$REDIS_URL",
     "redis_socketio": "$REDIS_URL"
