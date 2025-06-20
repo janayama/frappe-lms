@@ -31,7 +31,8 @@ WORKDIR /home/frappe/frappe-bench
 
 # Install the custom 'lms' app and build assets
 COPY --chown=frappe:frappe . /home/frappe/frappe-bench/apps/lms
-RUN pip install -e apps/lms && \
+RUN touch /home/frappe/frappe-bench/apps/lms/README.md && \
+    pip install -e apps/lms && \
     bench build
 
 # Final setup for the container
