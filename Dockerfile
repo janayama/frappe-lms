@@ -63,10 +63,10 @@ WORKDIR /home/frappe/frappe-bench
 # Copy the local 'lms' app source code into the apps directory of the bench
 COPY --chown=frappe:frappe . /home/frappe/frappe-bench/apps/lms
 
-# Install the 'lms' app into the bench.
-# This command handles dependencies and site registration.
-RUN bench get-app lms && \
-    bench setup requirements && \
+# Install the 'lms' app's dependencies and build its assets.
+# We do NOT use `get-app` because the app is already local.
+# `setup requirements` installs python/js deps, and `build` creates assets.
+RUN bench setup requirements && \
     bench build
 
 # Copy the runtime entrypoint script and make it executable
