@@ -17,6 +17,7 @@ ENV PATH="/home/frappe/.local/bin:$PATH"
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     curl \
+    cron \
     git \
     libmariadb-dev \
     pkg-config \
