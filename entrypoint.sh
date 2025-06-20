@@ -37,7 +37,7 @@ bench new-site "$SITE_NAME" \
     --db-port "$MARIADB_PORT" \
     --db-name "$MARIADB_DATABASE" \
     --db-password "$MARIADB_PASSWORD" \
-    --db-root-username "$MARIADB_USER" \
+    --db-root-username "root" \
     --db-root-password "$MARIADB_ROOT_PASSWORD" \
     --admin-password "$ADMIN_PASSWORD" \
     --install-app lms \
