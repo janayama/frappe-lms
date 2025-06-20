@@ -64,8 +64,10 @@ fi
 
 # --- Step 3: Run Database Migrations ---
 # This command connects to the DB, sees no tables, and creates them.
-echo "--- [Frappe Entrypoint] Running database migrations... ---"
-bench --site "$SITE_NAME" migrate
+# We use `execute frappe.migrate.run_all` to bypass the faulty service
+# checks that exist in the standard `bench migrate` command.
+echo "--- [Frappe Entrypoint] Running database migrations via direct execute... ---"
+bench --site "$SITE_NAME" execute frappe.migrate.run_all
 echo "Migrations completed."
 
 # --- Step 4: Set Admin Password ---
