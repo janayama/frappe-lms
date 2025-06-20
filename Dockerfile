@@ -15,17 +15,20 @@ RUN apt-get update && \
     curl \
     git \
     libmariadb-dev \
-    nodejs \
-    npm \
     pkg-config \
     redis-tools \
     vim-tiny \
     xvfb \
     fontconfig \
     xfonts-75dpi \
-    libssl1.1 \
-    && npm install -g yarn \
-    && rm -rf /var/lib/apt/lists/*
+    libssl1.1 && \
+    # Use the official NodeSource script to install Node.js 18
+    curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs && \
+    # Install yarn globally via npm
+    npm install -g yarn && \
+    # Clean up apt cache
+    rm -rf /var/lib/apt/lists/*
 
 # Install wkhtmltopdf for PDF generation, a crucial Frappe dependency
 # We use the version for Bullseye to match our base image
