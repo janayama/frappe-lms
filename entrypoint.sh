@@ -7,12 +7,17 @@ cd /home/frappe/frappe-bench
 
 # Use SITE_NAME from env, default if not set.
 SITE_NAME=${SITE_NAME:-"lms.localhost"}
+ADMIN_PASSWORD=${ADMIN_PASSWORD:-"admin"}
+MARIADB_HOST=${MARIADB_HOST:-"mariadb"}
+MARIADB_PORT=${MARIADB_PORT:-"3306"}
+MARIADB_DATABASE=${MARIADB_DATABASE:-"frappe"}
+MARIADB_USER=${MARIADB_USER:-"frappe"}
+MARIADB_PASSWORD=${MARIADB_PASSWORD:-"frappe"}
+REDIS_URL=${REDIS_URL:-"redis://redis:6379"}
 
-# If the site directory doesn't exist, this is a first-time run.
-if [ ! -d "sites/$SITE_NAME" ]; then
-    echo "--- [frappe] Site '$SITE_NAME' not found. Running first-time setup... ---"
-
-    # 1. Create site config files with credentials from environment variables.
+# Create the common site config if it doesn't exist
+if [ ! -f "sites/common_site_config.json" ]; then
+    echo "--- [frappe] Creating common_site_config.json ---"
     cat <<EOF > sites/common_site_config.json
 {
     "db_host": "$MARIADB_HOST",
@@ -22,34 +27,23 @@ if [ ! -d "sites/$SITE_NAME" ]; then
     "redis_socketio": "$REDIS_URL"
 }
 EOF
-
-    # Create the site directory BEFORE writing the site-specific config.
-    mkdir -p "sites/$SITE_NAME"
-
-    cat <<EOF > "sites/$SITE_NAME/site_config.json"
-{
-    "db_name": "$MARIADB_DATABASE",
-    "db_password": "$MARIADB_PASSWORD",
-    "db_user": "$MARIADB_USER"
-}
-EOF
-
-    # 2. Use `bench reinstall` for a robust, idempotent setup.
-    # It creates the DB schema and sets the admin password.
-    # --skip-service-check is CRITICAL for containerized environments.
-    bench --site "$SITE_NAME" reinstall --yes --admin-password "$ADMIN_PASSWORD" --skip-service-check
-    bench --site "$SITE_NAME" install-app lms
-    # Set the default site for future bench commands.
-    bench use "$SITE_NAME"
-
-    echo "--- [frappe] First-time setup complete. ---"
-else
-    echo "--- [frappe] Site '$SITE_NAME' found. Running migrations... ---"
-    # For subsequent starts, just run migrations.
-    # Use `bench execute` to call the migration function directly,
-    # bypassing the faulty service check in the `migrate` command.
-    bench --site "$SITE_NAME" execute frappe.migrate.run_all
 fi
+
+# Create the site
+echo "--- [frappe] Creating site '$SITE_NAME'... ---"
+bench new-site "$SITE_NAME" \
+  --db-name "$MARIADB_DATABASE" \
+  --db-user "$MARIADB_USER" \
+  --db-password "$MARIADB_PASSWORD" \
+  --admin-password "$ADMIN_PASSWORD" \
+  --install-app lms \
+  --force
+
+# Set the default site for future bench commands.
+bench use "$SITE_NAME"
+
+echo "--- [frappe] Running migrations... ---"
+bench --site "$SITE_NAME" migrate
 
 echo "--- [frappe] Starting Frappe server... ---"
 bench start 
