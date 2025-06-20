@@ -31,6 +31,10 @@ cd /home/frappe/frappe-bench
 # --- Step 1: Set Configuration ---
 echo "--- [Frappe Entrypoint] Setting site configuration... ---"
 # Set common configuration using bench set-config
+
+mkdir -p "sites/$SITE_NAME"
+touch "sites/$SITE_NAME/site_config.json"
+
 bench --site "$SITE_NAME" set-config db_host "$MARIADB_HOST"
 bench --site "$SITE_NAME" set-config db_port "$MARIADB_PORT"
 bench --site "$SITE_NAME" set-config redis_cache "$REDIS_URL"
