@@ -34,19 +34,25 @@ bench new-site "$SITE_NAME" \
     --db-host "$MARIADB_HOST" \
     --db-port "$MARIADB_PORT" \
     --db-name "$MARIADB_DATABASE" \
-    --db-user "$MARIADB_USER" \
     --db-password "$MARIADB_PASSWORD" \
     --admin-password "$ADMIN_PASSWORD" \
     --install-app lms \
     --no-mariadb-socket
 echo "Site created successfully."
 
-# --- Step 2: Configure Redis ---
-echo "--- [Frappe Entrypoint] Setting Redis configuration... ---"
+# --- Step 2: Configure Redis and Database User ---
+echo "--- [Frappe Entrypoint] Setting Redis and database configuration... ---"
 bench --site "$SITE_NAME" set-config redis_cache "$REDIS_URL"
 bench --site "$SITE_NAME" set-config redis_queue "$REDIS_URL"
 bench --site "$SITE_NAME" set-config redis_socketio "$REDIS_URL"
-echo "Redis configuration set successfully."
+
+# Set database user if different from database name
+if [ "$MARIADB_USER" != "$MARIADB_DATABASE" ]; then
+    echo "Setting database user to: $MARIADB_USER"
+    bench --site "$SITE_NAME" set-config db_user "$MARIADB_USER"
+fi
+
+echo "Configuration set successfully."
 
 # --- Step 3: Run Database Migrations ---
 # Use the standard bench migrate command with skip-failing flag for robustness
