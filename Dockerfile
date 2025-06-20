@@ -63,6 +63,15 @@ WORKDIR /home/frappe/frappe-bench
 # Copy the local 'lms' app source code into the apps directory of the bench
 COPY --chown=frappe:frappe . /home/frappe/frappe-bench/apps/lms
 
+# Initialize a git repository in the app directory, as bench expects this.
+# This is necessary because the COPY command does not include the .git directory.
+RUN cd /home/frappe/frappe-bench/apps/lms && \
+    git config --global user.name "Docker Build" && \
+    git config --global user.email "docker@example.com" && \
+    git init && \
+    git add . && \
+    git commit -m "Initial commit for build"
+
 # Install the 'lms' app's dependencies and build its assets.
 # We do NOT use `get-app` because the app is already local.
 # `setup requirements` installs python/js deps, and `build` creates assets.
