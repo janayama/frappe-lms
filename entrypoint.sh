@@ -44,6 +44,7 @@ bench --site "$SITE_NAME" set-config db_password "$MARIADB_PASSWORD"
 bench --site "$SITE_NAME" set-config db_user "$MARIADB_USER"
 echo "Configuration set successfully."
 
+bench --site all show-config -f json
 # --- Step 2: Manually "Install" Site ---
 # We bypass `new-site` which requires `CREATE USER` privileges.
 # We create a dummy installed.json and then let `migrate` create the schema.
