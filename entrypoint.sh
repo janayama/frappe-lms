@@ -35,9 +35,12 @@ bench new-site "$SITE_NAME" \
     --db-port "$MARIADB_PORT" \
     --db-name "$MARIADB_DATABASE" \
     --db-password "$MARIADB_PASSWORD" \
+    --db-root-username "$MARIADB_USER" \
+    --db-root-password "$MARIADB_PASSWORD" \
     --admin-password "$ADMIN_PASSWORD" \
     --install-app lms \
-    --no-mariadb-socket
+    --mariadb-user-host-login-scope='%' \
+    --force
 echo "Site created successfully."
 
 # --- Step 2: Configure Redis and Database User ---
@@ -51,6 +54,8 @@ if [ "$MARIADB_USER" != "$MARIADB_DATABASE" ]; then
     echo "Setting database user to: $MARIADB_USER"
     bench --site "$SITE_NAME" set-config db_user "$MARIADB_USER"
 fi
+
+-bench --site "$SITE_NAME" show-config -f json
 
 echo "Configuration set successfully."
 
