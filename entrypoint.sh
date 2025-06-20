@@ -28,29 +28,25 @@ echo "--- [Frappe Entrypoint] Initializing for site: $SITE_NAME ---"
 # The Dockerfile sets the working directory to /home/frappe/frappe-bench
 cd /home/frappe/frappe-bench
 
-# --- Step 1: Set Configuration ---
-echo "--- [Frappe Entrypoint] Setting site configuration... ---"
-# Set common configuration using bench set-config
+# --- Step 1: Set Common Configuration ---
+echo "--- [Frappe Entrypoint] Setting common configuration... ---"
+# Set Redis configuration that applies to all sites
+bench set-config redis_cache "$REDIS_URL"
+bench set-config redis_queue "$REDIS_URL"
+bench set-config redis_socketio "$REDIS_URL"
 
-mkdir -p "sites/$SITE_NAME"
-cat <<EOF > "sites/$SITE_NAME/site_config.json"
-{}
-EOF
-
-bench --site "$SITE_NAME" set-config db_host "$MARIADB_HOST"
-bench --site "$SITE_NAME" set-config db_port "$MARIADB_PORT"
-bench --site "$SITE_NAME" set-config redis_cache "$REDIS_URL"
-bench --site "$SITE_NAME" set-config redis_queue "$REDIS_URL"
-bench --site "$SITE_NAME" set-config redis_socketio "$REDIS_URL"
-
-# Create site directory and set site-specific configuration
-mkdir -p "sites/$SITE_NAME/logs"
-bench --site "$SITE_NAME" set-config db_name "$MARIADB_DATABASE"
-bench --site "$SITE_NAME" set-config db_password "$MARIADB_PASSWORD"
-bench --site "$SITE_NAME" set-config db_user "$MARIADB_USER"
-echo "Configuration set successfully."
-
-bench --site "$SITE_NAME" show-config -f json
+# --- Step 2: Create New Site ---
+echo "--- [Frappe Entrypoint] Creating new site with existing database... ---"
+bench new-site "$SITE_NAME" \
+    --db-host "$MARIADB_HOST" \
+    --db-port "$MARIADB_PORT" \
+    --db-name "$MARIADB_DATABASE" \
+    --db-user "$MARIADB_USER" \
+    --db-password "$MARIADB_PASSWORD" \
+    --admin-password "$ADMIN_PASSWORD" \
+    --install-app lms \
+    --no-mariadb-socket
+echo "Site created successfully."
 
 # --- Step 3: Run Database Migrations ---
 # Use the standard bench migrate command with skip-failing flag for robustness
