@@ -20,6 +20,7 @@ RUN apt-get update && \
     cron \
     git \
     libmariadb-dev \
+    mariadb-client \
     pkg-config \
     redis-tools \
     vim-tiny \
