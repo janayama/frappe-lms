@@ -28,14 +28,7 @@ echo "--- [Frappe Entrypoint] Initializing for site: $SITE_NAME ---"
 # The Dockerfile sets the working directory to /home/frappe/frappe-bench
 cd /home/frappe/frappe-bench
 
-# --- Step 1: Set Common Configuration ---
-echo "--- [Frappe Entrypoint] Setting common configuration... ---"
-# Set Redis configuration that applies to all sites
-bench set-config redis_cache "$REDIS_URL"
-bench set-config redis_queue "$REDIS_URL"
-bench set-config redis_socketio "$REDIS_URL"
-
-# --- Step 2: Create New Site ---
+# --- Step 1: Create New Site ---
 echo "--- [Frappe Entrypoint] Creating new site with existing database... ---"
 bench new-site "$SITE_NAME" \
     --db-host "$MARIADB_HOST" \
@@ -47,6 +40,13 @@ bench new-site "$SITE_NAME" \
     --install-app lms \
     --no-mariadb-socket
 echo "Site created successfully."
+
+# --- Step 2: Configure Redis ---
+echo "--- [Frappe Entrypoint] Setting Redis configuration... ---"
+bench --site "$SITE_NAME" set-config redis_cache "$REDIS_URL"
+bench --site "$SITE_NAME" set-config redis_queue "$REDIS_URL"
+bench --site "$SITE_NAME" set-config redis_socketio "$REDIS_URL"
+echo "Redis configuration set successfully."
 
 # --- Step 3: Run Database Migrations ---
 # Use the standard bench migrate command with skip-failing flag for robustness
