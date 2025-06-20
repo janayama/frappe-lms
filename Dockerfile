@@ -1,5 +1,6 @@
 # Use a specific version of the official Python image for reproducibility
-FROM python:3.11-slim
+# We lock this to Bullseye to ensure compatibility with wkhtmltopdf
+FROM python:3.11-slim-bullseye
 
 # Set environment variables to prevent interactive prompts during installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -8,7 +9,7 @@ ENV PYTHONUNBUFFERED=1
 ENV PATH="/home/frappe/.local/bin:$PATH"
 
 # Install system dependencies required by Frappe and LMS
-# This includes git, curl, mariadb client and dev headers, nodejs, yarn, and wkhtmltopdf
+# This includes git, curl, mariadb client and dev headers, nodejs, yarn, and wkhtmltopdf dependencies
 RUN apt-get update && \
     apt-get install -y \
     curl \
@@ -20,11 +21,14 @@ RUN apt-get update && \
     redis-tools \
     vim-tiny \
     xvfb \
-    libfontconfig1 \
+    fontconfig \
+    xfonts-75dpi \
+    libssl1.1 \
     && npm install -g yarn \
     && rm -rf /var/lib/apt/lists/*
 
 # Install wkhtmltopdf for PDF generation, a crucial Frappe dependency
+# We use the version for Bullseye to match our base image
 RUN curl -L https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-2/wkhtmltox_0.12.6.1-2.bullseye_amd64.deb -o wkhtmltopdf.deb && \
     apt-get install -y ./wkhtmltopdf.deb && \
     rm wkhtmltopdf.deb
