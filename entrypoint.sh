@@ -28,30 +28,21 @@ echo "--- [Frappe Entrypoint] Initializing for site: $SITE_NAME ---"
 # The Dockerfile sets the working directory to /home/frappe/frappe-bench
 cd /home/frappe/frappe-bench
 
-# --- Step 1: Write Config Files ---
-echo "--- [Frappe Entrypoint] Writing configuration files... ---"
-# Write common_site_config.json
-cat <<EOF > sites/common_site_config.json
-{
-    "db_host": "$MARIADB_HOST",
-    "db_port": "$MARIADB_PORT",
-    "redis_cache": "$REDIS_URL",
-    "redis_queue": "$REDIS_URL",
-    "redis_socketio": "$REDIS_URL"
-}
-EOF
-# Write site_config.json for the site
-mkdir -p "sites/$SITE_NAME"
-cat <<EOF > "sites/$SITE_NAME/site_config.json"
-{
-    "db_name": "$MARIADB_DATABASE",
-    "db_password": "$MARIADB_PASSWORD",
-    "db_user": "$MARIADB_USER"
-}
-EOF
-# Since we are creating the site manually, we also need to create the logs folder.
+# --- Step 1: Set Configuration ---
+echo "--- [Frappe Entrypoint] Setting site configuration... ---"
+# Set common configuration using bench set-config
+bench set-config db_host "$MARIADB_HOST"
+bench set-config db_port "$MARIADB_PORT"
+bench set-config redis_cache "$REDIS_URL"
+bench set-config redis_queue "$REDIS_URL"
+bench set-config redis_socketio "$REDIS_URL"
+
+# Create site directory and set site-specific configuration
 mkdir -p "sites/$SITE_NAME/logs"
-echo "Configuration files written successfully."
+bench --site "$SITE_NAME" set-config db_name "$MARIADB_DATABASE"
+bench --site "$SITE_NAME" set-config db_password "$MARIADB_PASSWORD"
+bench --site "$SITE_NAME" set-config db_user "$MARIADB_USER"
+echo "Configuration set successfully."
 
 # --- Step 2: Manually "Install" Site ---
 # We bypass `new-site` which requires `CREATE USER` privileges.
@@ -65,7 +56,8 @@ fi
 # --- Step 3: Run Database Migrations ---
 # Use the standard bench migrate command with skip-failing flag for robustness
 echo "--- [Frappe Entrypoint] Running database migrations... ---"
-bench --site "$SITE_NAME" migrate --skip-failing
+
+bench --site "$SITE_NAME" migrate
 echo "Migrations completed."
 
 # --- Step 4: Set Admin Password ---
