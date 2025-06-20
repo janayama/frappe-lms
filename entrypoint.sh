@@ -19,6 +19,8 @@ MARIADB_PORT=${MARIADB_PORT:-"3306"}
 MARIADB_DATABASE=${MARIADB_DATABASE:-"frappe"}
 MARIADB_USER=${MARIADB_USER:-"frappe"}
 MARIADB_PASSWORD=${MARIADB_PASSWORD:-"frappe"}
+MARIADB_ROOT_PASSWORD=${MARIADB_ROOT_PASSWORD:-"frappe"}
+
 
 # Redis URLs for caching, queues, and socket.io.
 REDIS_URL=${REDIS_URL:-"redis://redis:6379"}
@@ -36,7 +38,7 @@ bench new-site "$SITE_NAME" \
     --db-name "$MARIADB_DATABASE" \
     --db-password "$MARIADB_PASSWORD" \
     --db-root-username "$MARIADB_USER" \
-    --db-root-password "$MARIADB_PASSWORD" \
+    --db-root-password "$MARIADB_ROOT_PASSWORD" \
     --admin-password "$ADMIN_PASSWORD" \
     --install-app lms \
     --mariadb-user-host-login-scope='%' \
