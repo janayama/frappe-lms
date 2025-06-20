@@ -8,33 +8,40 @@ ENV BENCH_DEVELOPER=1
 ENV PYTHONUNBUFFERED=1
 ENV PATH="/home/frappe/.local/bin:$PATH"
 
-# Install system dependencies required by Frappe and LMS
-# This includes git, curl, mariadb client and dev headers, nodejs, yarn, and wkhtmltopdf dependencies
+# Install all system dependencies in a single, atomic RUN command.
+# This includes:
+# - Common utilities (git, curl, etc.)
+# - MariaDB client and dev headers for the python connector
+# - A complete, modern Node.js environment using the official NodeSource script
+# - A full set of dependencies for wkhtmltopdf to prevent recurring build failures
 RUN apt-get update && \
-    apt-get install -y \
+    apt-get install -y --no-install-recommends \
     curl \
     git \
     libmariadb-dev \
     pkg-config \
     redis-tools \
     vim-tiny \
+    # Full dependency list for wkhtmltopdf on Debian Bullseye
     xvfb \
+    libfontconfig1 \
     fontconfig \
+    libxrender1 \
+    libxext6 \
+    xfonts-base \
     xfonts-75dpi \
     libssl1.1 && \
     # Use the official NodeSource script to install Node.js 18
     curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
-    apt-get install -y nodejs && \
+    apt-get install -y --no-install-recommends nodejs && \
     # Install yarn globally via npm
     npm install -g yarn && \
-    # Clean up apt cache
-    rm -rf /var/lib/apt/lists/*
-
-# Install wkhtmltopdf for PDF generation, a crucial Frappe dependency
-# We use the version for Bullseye to match our base image
-RUN curl -L https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-2/wkhtmltox_0.12.6.1-2.bullseye_amd64.deb -o wkhtmltopdf.deb && \
+    # Download and install wkhtmltopdf in the same layer
+    curl -L https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-2/wkhtmltox_0.12.6.1-2.bullseye_amd64.deb -o wkhtmltopdf.deb && \
     apt-get install -y ./wkhtmltopdf.deb && \
-    rm wkhtmltopdf.deb
+    # Clean up downloaded files and apt cache
+    rm wkhtmltopdf.deb && \
+    rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user 'frappe' to run the application
 RUN useradd -ms /bin/bash frappe
