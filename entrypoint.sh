@@ -49,6 +49,8 @@ cat <<EOF > "sites/$SITE_NAME/site_config.json"
     "db_user": "$MARIADB_USER"
 }
 EOF
+# Since we are creating the site manually, we also need to create the logs folder.
+mkdir -p "sites/$SITE_NAME/logs"
 echo "Configuration files written successfully."
 
 # --- Step 2: Manually "Install" Site ---
