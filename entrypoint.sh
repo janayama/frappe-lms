@@ -63,12 +63,9 @@ if [ ! -f "sites/$SITE_NAME/installed.json" ]; then
 fi
 
 # --- Step 3: Run Database Migrations ---
-# We must bypass the faulty service checks in `bench migrate`.
-# We also bypass `bench execute` which has proven unreliable.
-# Instead, we use `bench python` to run a command snippet that calls the
-# migration function directly. This is the most reliable method.
-echo "--- [Frappe Entrypoint] Running database migrations via direct python execution... ---"
-bench --site "$SITE_NAME" python -c "from frappe.migrate import migrate; migrate(skip_failing=True)"
+# Use the standard bench migrate command with skip-failing flag for robustness
+echo "--- [Frappe Entrypoint] Running database migrations... ---"
+bench --site "$SITE_NAME" migrate --skip-failing
 echo "Migrations completed."
 
 # --- Step 4: Set Admin Password ---
