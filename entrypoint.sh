@@ -28,7 +28,21 @@ echo "--- [Frappe Entrypoint] Initializing for site: $SITE_NAME ---"
 # The Dockerfile sets the working directory to /home/frappe/frappe-bench
 cd /home/frappe/frappe-bench
 
-# --- Step 1: Configure Bench ---
+# --- Step 1: Configure MySQL Client ---
+# Create a .my.cnf file in the frappe user's home directory.
+# This is the standard way to provide credentials to the `mysql` command-line
+# client non-interactively. `bench` calls `mysql` under the hood, and this
+# prevents it from prompting for a password.
+echo "--- [Frappe Entrypoint] Writing .my.cnf to avoid password prompt ---"
+cat <<EOF > /home/frappe/.my.cnf
+[client]
+host=$MARIADB_HOST
+port=$MARIADB_PORT
+user=$MARIADB_USER
+password=$MARIADB_PASSWORD
+EOF
+
+# --- Step 2: Configure Bench ---
 # Create the common configuration file used by all sites managed by this bench.
 # This file tells Frappe how to connect to the database and Redis.
 echo "--- [Frappe Entrypoint] Writing common_site_config.json ---"
@@ -57,7 +71,7 @@ cat <<EOF > "sites/$SITE_NAME/site_config.json"
 EOF
 echo "Site-specific configuration written successfully."
 
-# --- Step 2: Create and Install Site ---
+# --- Step 3: Create and Install Site ---
 # Now that the config files are in place, `bench new-site` will use them automatically.
 # We no longer pass the --db-* flags. We only need to provide the site name,
 # admin password, and the app to install.
@@ -69,14 +83,14 @@ bench new-site "$SITE_NAME" \
   --force
 echo "Site creation command executed."
 
-# --- Step 3: Run Database Migrations ---
+# --- Step 4: Run Database Migrations ---
 # After the site is created, we must run migrations to ensure the database
 # schema is up-to-date with the latest version of the installed apps.
 echo "--- [Frappe Entrypoint] Running database migrations... ---"
 bench --site "$SITE_NAME" migrate
 echo "Migrations completed."
 
-# --- Step 4: Start the Application ---
+# --- Step 5: Start the Application ---
 # The `bench start` command reads the `Procfile` and starts all necessary
 # processes, including the web server, scheduler, and background workers.
 # While not a true production-grade process manager, it's the standard
