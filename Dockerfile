@@ -63,6 +63,10 @@ WORKDIR /home/frappe/frappe-bench
 # Copy the local 'lms' app source code into the apps directory of the bench
 COPY --chown=frappe:frappe . /home/frappe/frappe-bench/apps/lms
 
+# Create a dummy README.md to satisfy the PEP-621 build requirement, as
+# this file might be excluded by .dockerignore.
+RUN touch /home/frappe/frappe-bench/apps/lms/README.md
+
 # Initialize a git repository in the app directory, as bench expects this.
 # This is necessary because the COPY command does not include the .git directory.
 RUN cd /home/frappe/frappe-bench/apps/lms && \
