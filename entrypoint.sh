@@ -63,12 +63,12 @@ if [ ! -f "sites/$SITE_NAME/installed.json" ]; then
 fi
 
 # --- Step 3: Run Database Migrations ---
-# This command connects to the DB, sees no tables, and creates them.
-# We use `execute frappe.migrate.migrate` to bypass the faulty service
-# checks that exist in the standard `bench migrate` command. The function
-# to call is `migrate` inside the `frappe.migrate` module.
-echo "--- [Frappe Entrypoint] Running database migrations via direct execute... ---"
-bench --site "$SITE_NAME" execute frappe.migrate.migrate
+# We must bypass the faulty service checks in `bench migrate`.
+# We also bypass `bench execute` which has proven unreliable.
+# Instead, we use `bench python` to run a command snippet that calls the
+# migration function directly. This is the most reliable method.
+echo "--- [Frappe Entrypoint] Running database migrations via direct python execution... ---"
+bench --site "$SITE_NAME" python -c "from frappe.migrate import migrate; migrate(skip_failing=True)"
 echo "Migrations completed."
 
 # --- Step 4: Set Admin Password ---

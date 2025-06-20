@@ -57,11 +57,10 @@ RUN pip install --no-cache-dir frappe-bench
 # We use the --frappe-branch flag to ensure we get a compatible version.
 RUN bench init --skip-redis-config-generation --frappe-branch version-15 frappe-bench
 
-# --- DEBUGGING STEP ---
-# The following command will print the source code of the migration script.
-# This allows us to see the exact function names available in this version of Frappe.
-# This is a temporary step to find the correct function to call in entrypoint.sh.
-RUN cat /home/frappe/frappe-bench/apps/frappe/frappe/migrate.py
+# ---
+# THIS IS THE DEBUGGING COMMAND NEEDED
+# RUN cat /home/frappe/frappe-bench/apps/frappe/frappe/migrate.py
+# ---
 
 # Set the working directory to the newly created bench
 WORKDIR /home/frappe/frappe-bench
