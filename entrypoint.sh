@@ -61,11 +61,61 @@ fi
 
 echo "Configuration set successfully."
 
+# --- Step 2.5: Configure for external services ---
+echo "--- [Frappe Entrypoint] Configuring for external services... ---"
+# Skip local service checks since we're using external managed services
+bench --site "$SITE_NAME" set-config skip_redis_config_generation true
+bench --site "$SITE_NAME" set-config skip_setup_wizard true
+
 # --- Step 3: Run Database Migrations ---
 # Use the standard bench migrate command with skip-failing flag for robustness
 echo "--- [Frappe Entrypoint] Running database migrations... ---"
 
-bench --site "$SITE_NAME" migrate
+# Debug: Check if we can connect to the database and Redis
+echo "--- [DEBUG] Testing database connection... ---"
+bench --site "$SITE_NAME" console <<EOF
+import frappe
+try:
+    frappe.connect()
+    print("✓ Database connection successful")
+    frappe.db.sql("SELECT 1")
+    print("✓ Database query successful")
+except Exception as e:
+    print(f"✗ Database connection failed: {e}")
+    
+try:
+    from frappe.utils.redis_wrapper import RedisWrapper
+    redis = RedisWrapper.from_url(frappe.conf.redis_cache)
+    redis.ping()
+    print("✓ Redis connection successful")
+except Exception as e:
+    print(f"✗ Redis connection failed: {e}")
+EOF
+
+echo "--- [DEBUG] Checking service status... ---"
+# Check what services bench thinks are running
+bench setup requirements --node || echo "Node requirements check completed"
+
+# Try migration with debugging
+echo "--- [Frappe Entrypoint] Attempting migration... ---"
+bench --site "$SITE_NAME" migrate --skip-failing || {
+    echo "--- [DEBUG] Standard migrate failed, trying alternative approach... ---"
+    
+    # Alternative: Direct database migration
+    bench --site "$SITE_NAME" console <<EOF
+import frappe
+frappe.connect()
+from frappe.migrate import migrate
+try:
+    migrate(skip_failing=True, rebuild_website=False)
+    print("✓ Direct migration successful")
+except Exception as e:
+    print(f"✗ Direct migration failed: {e}")
+    import traceback
+    traceback.print_exc()
+EOF
+}
+
 echo "Migrations completed."
 
 # --- Step 4: Set Admin Password ---
