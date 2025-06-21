@@ -210,9 +210,25 @@ except Exception as e:
     exit(1)
 EOF
     
-    echo "Starting web server on port 8000..."
+    echo "Starting production web server with Gunicorn on port 8000..."
     echo "Site should be available at http://localhost:8000"
-    exec bench --site "$SITE_NAME" serve --port 8000
+    
+    # Set production environment
+    export FRAPPE_SITE="$SITE_NAME"
+    
+    # Start Gunicorn with proper configuration for production
+    exec gunicorn -b 0.0.0.0:8000 \
+        --workers 2 \
+        --worker-class gevent \
+        --worker-connections 1000 \
+        --max-requests 5000 \
+        --max-requests-jitter 500 \
+        --preload \
+        --timeout 120 \
+        --keepalive 2 \
+        --access-logfile - \
+        --error-logfile - \
+        frappe.app:application
     
 else
     echo "✗ Site configuration issue detected"

@@ -86,6 +86,7 @@ RUN cd /home/frappe/frappe-bench/apps/lms && \
 # We do NOT use `get-app` because the app is already local.
 # `setup requirements` installs python/js deps, and `build` creates assets.
 RUN bench setup requirements && \
+    pip install gunicorn gevent && \
     bench build
 
 # Copy the runtime entrypoint script and make it executable
