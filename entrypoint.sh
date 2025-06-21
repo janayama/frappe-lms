@@ -210,25 +210,53 @@ except Exception as e:
     exit(1)
 EOF
     
-    echo "Starting production web server with Gunicorn on port 8000..."
+    echo "Starting production web server on port 8000..."
     echo "Site should be available at http://localhost:8000"
     
-    # Set production environment
+    # Set production environment variables
     export FRAPPE_SITE="$SITE_NAME"
     
-    # Start Gunicorn with proper configuration for production
-    exec gunicorn -b 0.0.0.0:8000 \
-        --workers 2 \
-        --worker-class gevent \
-        --worker-connections 1000 \
-        --max-requests 5000 \
-        --max-requests-jitter 500 \
+    # Use bench's Gunicorn integration for production
+    # First create a production configuration
+    bench set-config developer_mode 0
+    bench set-config allow_tests 0
+    
+    # Create a simple Python script to start the WSGI app
+    cat > wsgi_app.py <<EOF
+import os
+import sys
+
+# Add the frappe-bench directory to Python path
+sys.path.insert(0, '/home/frappe/frappe-bench')
+
+# Set environment variables
+os.environ['FRAPPE_SITE'] = '$SITE_NAME'
+
+# Import and get the application
+from frappe.app import application
+
+# Make sure we expose the WSGI app correctly
+app = application
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8000)
+EOF
+
+    # Start Gunicorn with the custom WSGI app
+    exec gunicorn \
+        --bind=0.0.0.0:8000 \
+        --workers=2 \
+        --worker-class=gevent \
+        --worker-connections=1000 \
+        --max-requests=5000 \
+        --max-requests-jitter=500 \
         --preload \
-        --timeout 120 \
-        --keep-alive 2 \
-        --access-logfile - \
-        --error-logfile - \
-        frappe.app:application
+        --timeout=120 \
+        --keep-alive=2 \
+        --access-logfile=- \
+        --error-logfile=- \
+        --chdir=/home/frappe/frappe-bench \
+        wsgi_app:app
     
 else
     echo "✗ Site configuration issue detected"
