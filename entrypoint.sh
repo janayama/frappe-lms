@@ -101,45 +101,35 @@ echo "--- [DEBUG] Checking service status... ---"
 # Check what services bench thinks are running
 bench setup requirements --node || echo "Node requirements check completed"
 
-# Try migration with debugging
+# Try migration with simplified approach
 echo "--- [Frappe Entrypoint] Attempting migration... ---"
-bench --site "$SITE_NAME" migrate --skip-failing || {
-    echo "--- [DEBUG] Standard migrate failed, trying alternative approach... ---"
+if bench --site "$SITE_NAME" migrate --skip-failing; then
+    echo "✓ Standard migration completed successfully"
+else
+    echo "--- [DEBUG] Standard migrate failed, trying console approach... ---"
     
-    # Alternative: Direct database migration using different approach
-    echo "--- [DEBUG] Trying direct migration via execute command... ---"
-    
-    # Method 1: Use bench execute to run migrate with correct Python syntax
-    bench --site "$SITE_NAME" execute frappe.migrate.migrate --kwargs '{"skip_failing": True}' || {
-        echo "--- [DEBUG] bench execute failed, trying console approach... ---"
-        
-        # Method 2: Use console with correct import
-        bench --site "$SITE_NAME" console <<EOF
+    # Use console approach which is more reliable
+    bench --site "$SITE_NAME" console <<EOF
 import frappe
 frappe.connect()
 try:
-    # Try different import paths for different Frappe versions
+    # First try to run migrations
     try:
         import frappe.migrate
         frappe.migrate.migrate(skip_failing=True)
-        print("✓ Direct migration successful (frappe.migrate)")
-    except (ImportError, AttributeError):
-        try:
-            from frappe.core.doctype.patch_log.patch_log import run_all_patches
-            run_all_patches()
-            print("✓ Patches applied successfully")
-        except Exception as e2:
-            print(f"✗ Patch application failed: {e2}")
-            # Last resort: Just sync the database
-            frappe.db.sync_with_database()
-            print("✓ Database synced")
+        print("✓ Migration completed successfully")
+    except Exception as e1:
+        print(f"Migration failed, trying database sync: {e1}")
+        # Fallback: sync database schema
+        frappe.db.sync_with_database()
+        print("✓ Database schema synchronized")
 except Exception as e:
-    print(f"✗ All migration attempts failed: {e}")
+    print(f"✗ Migration failed: {e}")
+    # Don't fail the entire deployment, just log the error
     import traceback
     traceback.print_exc()
 EOF
-    }
-}
+fi
 
 echo "Migrations completed."
 
