@@ -221,9 +221,9 @@ EOF
     bench set-config allow_tests 0
     
     # Use the development server which is more reliable for containerized deployments
-    # This will bind to all interfaces on port 8000
+    # This will start on port 8000
     echo "Starting development server on port 8000..."
-    exec bench --site "$SITE_NAME" serve --port 8000 --host 0.0.0.0
+    exec bench --site "$SITE_NAME" serve --port 8000
     
 else
     echo "✗ Site configuration issue detected"
