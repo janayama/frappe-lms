@@ -145,42 +145,37 @@ bench --site "$SITE_NAME" set-admin-password "$ADMIN_PASSWORD" --logout-all-sess
 echo "Admin password set."
 
 # --- Step 5: Start Application ---
-# Create a custom Procfile for containerized deployment with external services
-echo "--- [Frappe Entrypoint] Creating custom Procfile for external services... ---"
-cat > Procfile <<EOF
-web: bench serve --port 8000 --host 0.0.0.0
-worker: bench worker --queue default,short,long
-schedule: bench schedule
-socketio: bench node-socketio
+echo "--- [Frappe Entrypoint] Starting Frappe application... ---"
+
+# Debug: Check if configuration is being read properly
+echo "--- [DEBUG] Checking Redis configuration... ---"
+bench --site "$SITE_NAME" console <<EOF
+import frappe
+print(f"Redis Cache: {frappe.conf.get('redis_cache', 'NOT SET')}")
+print(f"Redis Queue: {frappe.conf.get('redis_queue', 'NOT SET')}")
+print(f"Redis SocketIO: {frappe.conf.get('redis_socketio', 'NOT SET')}")
 EOF
 
-echo "--- [Frappe Entrypoint] Starting Frappe processes... ---"
-# Start each service with better error handling
+# Test Redis connectivity before starting services
+echo "--- [DEBUG] Testing Redis connectivity... ---"
+python3 -c "
+import redis
+import os
+redis_url = os.environ.get('REDIS_URL', '')
+if redis_url:
+    try:
+        r = redis.Redis.from_url(redis_url)
+        r.ping()
+        print('✓ Redis connection successful')
+    except Exception as e:
+        print(f'✗ Redis connection failed: {e}')
+else:
+    print('✗ REDIS_URL not set')
+"
+
+# Start services one by one with proper error handling
+echo "--- [Frappe Entrypoint] Starting web server only for now... ---"
+
+# First, try to start just the web server to see if basic functionality works
 echo "Starting web server on port 8000..."
-bench serve --port 8000 --host 0.0.0.0 &
-WEB_PID=$!
-
-echo "Starting background worker..."
-bench worker --queue default,short,long &
-WORKER_PID=$!
-
-echo "Starting scheduler..."
-bench schedule &
-SCHEDULE_PID=$!
-
-echo "Starting socket.io server..."
-bench node-socketio &
-SOCKETIO_PID=$!
-
-# Function to handle shutdown
-cleanup() {
-    echo "Shutting down services..."
-    kill $WEB_PID $WORKER_PID $SCHEDULE_PID $SOCKETIO_PID 2>/dev/null
-    wait
-    exit 0
-}
-
-trap cleanup SIGTERM SIGINT
-
-echo "All services started. Waiting..."
-wait $WEB_PID 
+exec bench --site "$SITE_NAME" serve --port 8000 
