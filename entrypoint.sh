@@ -225,7 +225,7 @@ EOF
         --max-requests-jitter 500 \
         --preload \
         --timeout 120 \
-        --keepalive 2 \
+        --keep-alive 2 \
         --access-logfile - \
         --error-logfile - \
         frappe.app:application
