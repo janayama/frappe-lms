@@ -69,8 +69,8 @@ echo "Configuration set successfully."
 # --- Step 2.5: Configure for external services ---
 echo "--- [Frappe Entrypoint] Configuring for external services... ---"
 # Skip local service checks since we're using external managed services
-bench --site "$SITE_NAME" set-config skip_redis_config_generation true
-bench --site "$SITE_NAME" set-config skip_setup_wizard true
+bench --site "$SITE_NAME" set-config skip_redis_config_generation 1
+bench --site "$SITE_NAME" set-config skip_setup_wizard 1
 
 # --- Step 3: Run Database Migrations ---
 # Use the standard bench migrate command with skip-failing flag for robustness
