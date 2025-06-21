@@ -31,19 +31,24 @@ echo "--- [Frappe Entrypoint] Initializing for site: $SITE_NAME ---"
 cd /home/frappe/frappe-bench
 
 # --- Step 1: Create New Site ---
-echo "--- [Frappe Entrypoint] Creating new site with existing database... ---"
-bench new-site "$SITE_NAME" \
-    --db-host "$MARIADB_HOST" \
-    --db-port "$MARIADB_PORT" \
-    --db-name "$MARIADB_DATABASE" \
-    --db-password "$MARIADB_PASSWORD" \
-    --db-root-username "root" \
-    --db-root-password "$MARIADB_ROOT_PASSWORD" \
-    --admin-password "$ADMIN_PASSWORD" \
-    --install-app lms \
-    --mariadb-user-host-login-scope='%' \
-    --force
-echo "Site created successfully."
+echo "--- [Frappe Entrypoint] Checking if site exists... ---"
+if [ -d "sites/$SITE_NAME" ] && [ -f "sites/$SITE_NAME/site_config.json" ]; then
+    echo "Site $SITE_NAME already exists, skipping creation..."
+else
+    echo "--- [Frappe Entrypoint] Creating new site with existing database... ---"
+    bench new-site "$SITE_NAME" \
+        --db-host "$MARIADB_HOST" \
+        --db-port "$MARIADB_PORT" \
+        --db-name "$MARIADB_DATABASE" \
+        --db-password "$MARIADB_PASSWORD" \
+        --db-root-username "root" \
+        --db-root-password "$MARIADB_ROOT_PASSWORD" \
+        --admin-password "$ADMIN_PASSWORD" \
+        --install-app lms \
+        --mariadb-user-host-login-scope='%' \
+        --force
+    echo "Site created successfully."
+fi
 
 # --- Step 2: Configure Redis and Database User ---
 echo "--- [Frappe Entrypoint] Setting Redis and database configuration... ---"
@@ -157,25 +162,61 @@ print(f"Redis SocketIO: {frappe.conf.get('redis_socketio', 'NOT SET')}")
 EOF
 
 # Test Redis connectivity before starting services
-echo "--- [DEBUG] Testing Redis connectivity... ---"
-python3 -c "
-import redis
-import os
-redis_url = os.environ.get('REDIS_URL', '')
-if redis_url:
-    try:
-        r = redis.Redis.from_url(redis_url)
-        r.ping()
-        print('✓ Redis connection successful')
-    except Exception as e:
-        print(f'✗ Redis connection failed: {e}')
-else:
-    print('✗ REDIS_URL not set')
-"
+echo "--- [DEBUG] Testing Redis connectivity using Frappe's Redis... ---"
+bench --site "$SITE_NAME" console <<EOF
+import frappe
+try:
+    from frappe.utils.redis_wrapper import RedisWrapper
+    
+    # Test cache Redis
+    cache_redis = RedisWrapper.from_url(frappe.conf.redis_cache)
+    cache_redis.ping()
+    print('✓ Redis Cache connection successful')
+    
+    # Test queue Redis  
+    queue_redis = RedisWrapper.from_url(frappe.conf.redis_queue)
+    queue_redis.ping()
+    print('✓ Redis Queue connection successful')
+    
+    # Test socketio Redis
+    socketio_redis = RedisWrapper.from_url(frappe.conf.redis_socketio)
+    socketio_redis.ping()
+    print('✓ Redis SocketIO connection successful')
+    
+except Exception as e:
+    print(f'✗ Redis connectivity test failed: {e}')
+    import traceback
+    traceback.print_exc()
+EOF
 
 # Start services one by one with proper error handling
-echo "--- [Frappe Entrypoint] Starting web server only for now... ---"
+echo "--- [Frappe Entrypoint] Starting web server... ---"
 
-# First, try to start just the web server to see if basic functionality works
-echo "Starting web server on port 8000..."
-exec bench --site "$SITE_NAME" serve --port 8000 
+# Ensure the site is properly initialized before starting the server
+echo "--- [DEBUG] Final site check... ---"
+if bench --site "$SITE_NAME" list-apps >/dev/null 2>&1; then
+    echo "✓ Site is properly configured"
+    
+    # Check if we can connect to all required services
+    echo "--- [DEBUG] Final connectivity check... ---"
+    bench --site "$SITE_NAME" console <<EOF
+import frappe
+try:
+    frappe.connect()
+    frappe.db.sql("SELECT 1")
+    print("✓ Database connectivity confirmed")
+except Exception as e:
+    print(f"✗ Database issue: {e}")
+    exit(1)
+EOF
+    
+    echo "Starting web server on port 8000..."
+    echo "Site should be available at http://localhost:8000"
+    exec bench --site "$SITE_NAME" serve --port 8000
+    
+else
+    echo "✗ Site configuration issue detected"
+    echo "--- [DEBUG] Site status check... ---"
+    ls -la "sites/$SITE_NAME/" || echo "Site directory not found"
+    exit 1
+fi 
