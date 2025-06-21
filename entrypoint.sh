@@ -220,9 +220,10 @@ EOF
     bench set-config developer_mode 0
     bench set-config allow_tests 0
     
-    # Use bench serve which is the proper way to start Frappe in production
-    # This handles all the WSGI setup correctly
-    exec bench serve --port 8000 --site "$SITE_NAME"
+    # Use the development server which is more reliable for containerized deployments
+    # This will bind to all interfaces on port 8000
+    echo "Starting development server on port 8000..."
+    exec bench --site "$SITE_NAME" serve --port 8000 --host 0.0.0.0
     
 else
     echo "✗ Site configuration issue detected"
