@@ -109,8 +109,8 @@ bench --site "$SITE_NAME" migrate --skip-failing || {
     # Alternative: Direct database migration using different approach
     echo "--- [DEBUG] Trying direct migration via execute command... ---"
     
-    # Method 1: Use bench execute to run migrate
-    bench --site "$SITE_NAME" execute frappe.migrate.migrate --kwargs '{"skip_failing": true}' || {
+    # Method 1: Use bench execute to run migrate with correct Python syntax
+    bench --site "$SITE_NAME" execute frappe.migrate.migrate --kwargs '{"skip_failing": True}' || {
         echo "--- [DEBUG] bench execute failed, trying console approach... ---"
         
         # Method 2: Use console with correct import
