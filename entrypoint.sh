@@ -101,19 +101,39 @@ echo "--- [Frappe Entrypoint] Attempting migration... ---"
 bench --site "$SITE_NAME" migrate --skip-failing || {
     echo "--- [DEBUG] Standard migrate failed, trying alternative approach... ---"
     
-    # Alternative: Direct database migration
-    bench --site "$SITE_NAME" console <<EOF
+    # Alternative: Direct database migration using different approach
+    echo "--- [DEBUG] Trying direct migration via execute command... ---"
+    
+    # Method 1: Use bench execute to run migrate
+    bench --site "$SITE_NAME" execute frappe.migrate.migrate --kwargs '{"skip_failing": true}' || {
+        echo "--- [DEBUG] bench execute failed, trying console approach... ---"
+        
+        # Method 2: Use console with correct import
+        bench --site "$SITE_NAME" console <<EOF
 import frappe
 frappe.connect()
-from frappe.migrate import migrate
 try:
-    migrate(skip_failing=True, rebuild_website=False)
-    print("✓ Direct migration successful")
+    # Try different import paths for different Frappe versions
+    try:
+        import frappe.migrate
+        frappe.migrate.migrate(skip_failing=True)
+        print("✓ Direct migration successful (frappe.migrate)")
+    except (ImportError, AttributeError):
+        try:
+            from frappe.core.doctype.patch_log.patch_log import run_all_patches
+            run_all_patches()
+            print("✓ Patches applied successfully")
+        except Exception as e2:
+            print(f"✗ Patch application failed: {e2}")
+            # Last resort: Just sync the database
+            frappe.db.sync_with_database()
+            print("✓ Database synced")
 except Exception as e:
-    print(f"✗ Direct migration failed: {e}")
+    print(f"✗ All migration attempts failed: {e}")
     import traceback
     traceback.print_exc()
 EOF
+    }
 }
 
 echo "Migrations completed."
@@ -125,6 +145,42 @@ bench --site "$SITE_NAME" set-admin-password "$ADMIN_PASSWORD" --logout-all-sess
 echo "Admin password set."
 
 # --- Step 5: Start Application ---
-# Start the Frappe processes using the Procfile.
-echo "--- [Frappe Entrypoint] Starting Frappe processes via 'bench start'... ---"
-bench start 
+# Create a custom Procfile for containerized deployment with external services
+echo "--- [Frappe Entrypoint] Creating custom Procfile for external services... ---"
+cat > Procfile <<EOF
+web: bench serve --port 8000 --host 0.0.0.0
+worker: bench worker --queue default,short,long
+schedule: bench schedule
+socketio: bench node-socketio
+EOF
+
+echo "--- [Frappe Entrypoint] Starting Frappe processes... ---"
+# Start each service with better error handling
+echo "Starting web server on port 8000..."
+bench serve --port 8000 --host 0.0.0.0 &
+WEB_PID=$!
+
+echo "Starting background worker..."
+bench worker --queue default,short,long &
+WORKER_PID=$!
+
+echo "Starting scheduler..."
+bench schedule &
+SCHEDULE_PID=$!
+
+echo "Starting socket.io server..."
+bench node-socketio &
+SOCKETIO_PID=$!
+
+# Function to handle shutdown
+cleanup() {
+    echo "Shutting down services..."
+    kill $WEB_PID $WORKER_PID $SCHEDULE_PID $SOCKETIO_PID 2>/dev/null
+    wait
+    exit 0
+}
+
+trap cleanup SIGTERM SIGINT
+
+echo "All services started. Waiting..."
+wait $WEB_PID 
